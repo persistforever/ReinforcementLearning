@@ -16,7 +16,7 @@ class MDP:
         self.actions = range(-5, 6, 1)
         self.gamma = 0.9
         self.const_rental = False
-        self.const_return = True
+        self.const_return = False
     
     def _init_states(self, max_car):
         states, states_dict, n = [], {}, 0
