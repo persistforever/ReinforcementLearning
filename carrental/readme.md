@@ -32,8 +32,8 @@ Jack在A和B两个地点拥有车辆租赁系统，每天，一些客户在两�
 
 在策略迭代的循环中，每步计算出的状态值函数如下。
 
-<img width="100%" height="100%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value1.png?raw=true">
-<img width="1%" height="1%" src="https://github.com/persistforever/ReinforcementLearning/edit/master/carrental/experiments/value2.png?raw=true">
+<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value1.png?raw=true">
+<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/edit/master/carrental/experiments/value2.png?raw=true">
 <img width="5%" height="5%" src="https://github.com/persistforever/ReinforcementLearning/edit/master/carrental/experiments/value3.png?raw=true">
 <img width="5%" height="5%" src="https://github.com/persistforever/ReinforcementLearning/edit/master/carrental/experiments/value4.png?raw=true">
 
