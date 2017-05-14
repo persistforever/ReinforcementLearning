@@ -31,6 +31,6 @@ Jack在A和B两个地点拥有车辆租赁系统，每天，一些客户在两�
 ## 实验结果
 
 在策略迭代的循环中，每步计算出的状态值函数如下。
-<img width="33%" height="33%" src="https://github.com/persistforever/ReinforcementLearning/edit/master/carrental/experiments/value1.png">
+<img width="33%" height="33%" src="https://github.com/persistforever/ReinforcementLearning/edit/master/carrental/experiments/value1.png?raw=True">
 
 每步算出的策略如下。
