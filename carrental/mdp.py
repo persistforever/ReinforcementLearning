@@ -16,7 +16,7 @@ class MDP:
         self.actions = range(-5, 6, 1)
         self.gamma = 0.9
         self.const_rental = False
-        self.const_return = False
+        self.const_return = True
     
     def _init_states(self, max_car):
         states, states_dict, n = [], {}, 0
@@ -49,14 +49,13 @@ class MDP:
                 for stateid in range(len(self.states)):
                     actionid = self._get_action_from_policy(self.states[stateid], \
                                                             self.policy[stateid])
-                    transition = self._get_transition(self.states[stateid], \
-                                                      self.actions[actionid])
+                    transition, reward = self._get_transition_reward(self.states[stateid], \
+                                                                     self.actions[actionid])
                     for new_stateid in range(len(self.states)):
                         p = transition[new_stateid]
-                        reward = self._get_reward(self.states[stateid], self.actions[actionid], \
-                                                  self.states[new_stateid])
+                        r = reward[new_stateid]
                         new_value_function[stateid] += p * \
-                            (reward + self.gamma * self.value_function[new_stateid])
+                            (r + self.gamma * self.value_function[new_stateid])
                 self.value_function = new_value_function
                 if self._can_exit(last_value_function, self.value_function):
                     break
@@ -69,14 +68,12 @@ class MDP:
                 for actionid in range(len(self.actions)):
                     if self.actions[actionid] in valid_actions:
                         action_value = 0.0
-                        transition = self._get_transition(self.states[stateid], \
-                                                          self.actions[actionid])
+                        transition, reward = self._get_transition_reward(self.states[stateid], \
+                                                                         self.actions[actionid])
                         for new_stateid in range(len(self.states)):
                             p = transition[new_stateid]
-                            reward = self._get_reward(self.states[stateid], \
-                                                      self.actions[actionid], \
-                                                      self.states[new_stateid])
-                            action_value += p * (reward + self.gamma * \
+                            r = reward[new_stateid]
+                            action_value += p * (r + self.gamma * \
                                                  self.value_function[new_stateid])
                         if action_value >= max_value:
                             max_action = actionid
@@ -115,18 +112,20 @@ class MDP:
             self.poissonBackup[key] = math.exp(-lam) * pow(lam, n) / math.factorial(n)
         return self.poissonBackup[key]
     
-    def _get_transition(self, state, action):
+    def _get_transition_reward(self, state, action):
         state = [int(t) for t in state.split('#')]
         state[0] -= action
         state[1] += action
         transition = numpy.zeros((len(self.states), ), dtype='float')
+        reward = numpy.zeros((len(self.states), ), dtype='float')
         if self.const_rental:
-            temp_state = [state[0] - min(state[0], 3), \
-                          state[1] - min(state[1], 4)]
-            new_state = [temp_state[0] + min(3, min(state[0], 3)), \
-                         temp_state[1] + min(2, min(state[1], 4))]
+            rentala, rentalb = min(state[0], 3), min(state[1], 4)
+            temp_state = [state[0] - rentala, state[1] - rentalb]
+            new_state = [temp_state[0] + min(3, rentala), \
+                         temp_state[1] + min(2, rentalb)]
             new_stateid = self.states_dict['%i#%i' % (new_state[0], new_state[1])]
             transition[new_stateid] = 1.0
+            reward[new_stateid] = action * (-2) + (rentala + rentalb) * 10
         else:
             for rentala in range(0, state[0]+1):
                 for rentalb in range(0, state[1]+1):
@@ -147,17 +146,9 @@ class MDP:
                                 transition[new_stateid] = self._poisson(rentala, 3) * \
                                     self._poisson(rentalb, 4) * self._poisson(returna, 3) * \
                                     self._poisson(returnb, 2)
+                    reward[new_stateid] = (action * (-2) + (rentala + rentalb) * 10)
                     
-        return transition
-    
-    def _get_reward(self, state, action, new_state):
-        new_state = [int(t) for t in new_state.split('#')]
-        reward = 0
-        reward -= abs(action) * 2 # 车辆转移支出
-        reward += min(new_state[0], 3) * 10 # A地出租收入
-        reward += min(new_state[1], 4) * 10 # B地出租收入
-            
-        return reward
+        return transition, reward
         
     def _plot_value_function(self, value_function, n_iter):
         value_matrix = numpy.zeros((self.max_car+1, self.max_car+1), dtype='float')
