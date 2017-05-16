@@ -32,20 +32,12 @@ Jack在A和B两个地点拥有车辆租赁系统，每天，一些客户在两�
 
 在策略迭代的循环中，每步计算出的状态值函数如下。
 
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value1.png?raw=true"> 
+<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value1.png?raw=true"> <img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value2.png?raw=true"> 
 
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value2.png?raw=true"> 
-
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value3.png?raw=true"> 
-
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value4.png?raw=true">
+<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value3.png?raw=true"> <img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/value4.png?raw=true">
 
 每步算出的策略如下。
 
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy1.png?raw=true">
+<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy1.png?raw=true"> <img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy2.png?raw=true">
 
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy2.png?raw=true">
-
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy3.png?raw=true">
-
-<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy4.png?raw=true">
+<img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy3.png?raw=true"> <img width="40%" height="40%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/carrental/experiments/policy4.png?raw=true">
