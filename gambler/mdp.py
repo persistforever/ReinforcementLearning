@@ -97,11 +97,12 @@ class MDP:
     def _plot_final_policy(self, policy):
         state_actions = []
         for state in range(len(policy)):
-            for action in policy[state]:
-                state_actions.append([state+1, action])
+            # for action in min(policy[state]):
+            state_actions.append([state+1, min(policy[state])])
         print state_actions
         fig = plt.figure()
-        plt.plot([t[0] for t in state_actions], [t[1] for t in state_actions], '.', c='#6495ED')
+        plt.bar([t[0] for t in state_actions], [t[1] for t in state_actions], width=0.5, \
+                color='#6495ED')
         plt.title('final target policy')
         plt.xlabel('states')
         plt.ylabel('action')
