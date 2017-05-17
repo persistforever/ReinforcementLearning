@@ -28,11 +28,28 @@
 
 ## 实验结果
 
+### 值迭代算法
+
 在值迭代的循环中，每步计算出的状态值函数如下。
 
-<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/gambler/experiments/value.png?raw=true">
-
+<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/gambler/experiments/value1.png?raw=true">
 
 算出的最优策略如下。
 
-<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/gambler/experiments/policy.png?raw=true">
+<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/gambler/experiments/policy1.png?raw=true">
+
+### 策略迭代算法
+
+在策略迭代的循环中，每步计算出的状态值函数如下。
+
+<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/gambler/experiments/value2.png?raw=true">
+
+算出的最优策略如下。
+
+<img width="50%" height="50%" src="https://github.com/persistforever/ReinforcementLearning/blob/master/gambler/experiments/policy2.png?raw=true">
+
+### 效率对比
+
+策略迭代算法耗时0.334秒，值函数计算次数为525次。
+值迭代算法耗时0.044秒，值函数计算次数为27次。
+而两者算出的目标策略相同，因此得出结论，值迭代算法比策略迭代算法效率更高。
