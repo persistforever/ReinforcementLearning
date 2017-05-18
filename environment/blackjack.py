@@ -21,6 +21,7 @@ class Environment:
 			reward = 0
 			done = False
 		state = self.player_score if self.player_score <= 21 else 22
+		# print 'dealer_score %i' % (self.dealer_score)
 		return dealer_showing, state, reward, done
 		
 	def _init_dealer(self):
@@ -79,7 +80,7 @@ class Environment:
 					self.player_score += 1
 			else:
 				self.player_score += int(card)
-			done = True if self.player_score > 21 else False
+			done = False
 		elif action == 'stick':
 			done = True
 		# judge new state
@@ -114,6 +115,6 @@ class Environment:
 						reward = -1
 		else:
 			reward = 0
-		state = self.player_score if self.player_score <= 21 else 22
+		state = 22 if self.player_score > 21 else self.player_score 
 			
 		return state, reward, done
