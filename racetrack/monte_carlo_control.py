@@ -52,23 +52,25 @@ class MonteCarlo:
         policy = numpy.zeros((len(self.states), len(self.actions)), dtype='float')
         for stateid in range(len(self.states)):
             for actionid in range(len(self.actions)):
-                policy[stateid, actionid] = 0.0
-            actionid = random.randint(0, len(self.actions)-1)
-            policy[stateid, actionid] = 1.0
+                policy[stateid, actionid] = 1.0 / len(self.actions)
         
         return policy
         
     def monte_carlo_control_first_visit_exploring_start(self):
         n_iter = 0
+        pic_dict = {}
         while True:
             # 初始化
             state, reward, done = self.env.reset()
-            stateid = self.states_dict['%i#%i' % (state[0], state[1])]
+            position_str = '%i#%i' % (state[0], state[1])
+            stateid = self.states_dict[position_str]
             episode = []
             # 开始时探索
+            self.env.render()
             actionid = random.choice(range(len(self.actions)))
             new_state, reward, done = self.env.step(action=self.actions[actionid])
             new_stateid = self.states_dict['%i#%i' % (new_state[0], new_state[1])]
+            # print new_stateid, reward, done
             episode.append([stateid, actionid, reward])
             stateid = new_stateid
             # 根据当前策略生成轨迹
@@ -80,7 +82,21 @@ class MonteCarlo:
                 # print new_stateid, reward, done
                 episode.append([stateid, actionid, reward])
                 stateid = new_stateid
-            # self._print_episode(episode)
+            # 如果轨迹中走了回头路，就对其reward进行惩罚
+            state_visited = {}
+            for idx, [stateid, actionid, reward] in enumerate(episode):
+                if stateid not in state_visited:
+                    state_visited[stateid] = None
+                else:
+                    episode[idx][2] = -100
+            # 对每一个冲出赛道的点进行重复惩罚
+            if episode[-1][2] == -100:
+                [stateid, actionid, reward] = episode[-1]
+                if stateid not in self.wall_rewards:
+                    self.wall_rewards[stateid] = 0
+                self.wall_rewards[stateid] += reward
+                episode[-1][2] = self.wall_rewards[stateid]
+            print episode
             # 根据轨迹更新状态值函数
             state_visited = {}
             state_action_visited = {}
@@ -101,7 +117,6 @@ class MonteCarlo:
                         / self.action_count[stateid, actionid]
             # 根据动作值函数更新策略
             state_visited = {}
-            print episode
             for _, [stateid, actionid, reward] in enumerate(episode):
                 if stateid not in state_visited:
                     state_visited[stateid] = None
@@ -110,21 +125,25 @@ class MonteCarlo:
                     actionid = max(enumerate(list(self.action_function[stateid,:])), \
                                    key=lambda x: x[1])[0]
                     self.policy[stateid, actionid] = 1.0
+            # 如果本次走到终点，则保存图片
+            if episode[-1][2] == 1000:
+                # 获得保存图片的序号
+                if position_str not in pic_dict:
+                    pic_dict[position_str] = 0
+                pic_dict[position_str] += 1
+                path = self.path + '_' + position_str + '_' + str(pic_dict[position_str]) +'.jpg'
+                self.env.render(is_save=True, path=path)
             n_iter += 1
         
-    def monte_carlo_control_first_visit_exploring_start_on_policy(self):
+    def monte_carlo_control_first_visit_on_policy(self):
         n_iter = 0
+        pic_dict = {}
         while True:
             # 初始化
             state, reward, done = self.env.reset()
-            stateid = self.states_dict['%i#%i' % (state[0], state[1])]
+            position_str = '%i#%i' % (state[0], state[1])
+            stateid = self.states_dict[position_str]
             episode = []
-            # 开始时探索
-            actionid = random.choice(range(len(self.actions)))
-            new_state, reward, done = self.env.step(action=self.actions[actionid])
-            new_stateid = self.states_dict['%i#%i' % (new_state[0], new_state[1])]
-            episode.append([stateid, actionid, reward])
-            stateid = new_stateid
             # 根据当前策略生成轨迹
             while not done and len(episode) < 100:
                 self.env.render()
@@ -180,7 +199,12 @@ class MonteCarlo:
                         self.epsilon / len(self.actions)
             # 如果本次走到终点，则保存图片
             if episode[-1][2] == 1000:
-                self.env.render(is_save=True, path=self.path)
+                # 获得保存图片的序号
+                if position_str not in pic_dict:
+                    pic_dict[position_str] = 0
+                pic_dict[position_str] += 1
+                path = self.path + '_' + position_str + '.jpg'
+                self.env.render(is_save=True, path=path)
             n_iter += 1
             
     def _sample_episode(self, policy, stateid):
@@ -198,6 +222,6 @@ class MonteCarlo:
         print 'episode end %s' % ('='*20)
         
         
-mc = MonteCarlo(path='experiments/final.jpg')
+mc = MonteCarlo(path='experiments/on_policy/final')
 # mc.monte_carlo_control_first_visit_exploring_start()
-mc.monte_carlo_control_first_visit_exploring_start_on_policy()
+mc.monte_carlo_control_first_visit_on_policy()
