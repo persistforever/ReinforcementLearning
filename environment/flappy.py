@@ -1,7 +1,12 @@
+# -*- coding: utf-8 -*-
+# author: ronniecao
+# time: 2017/12/09
+# description: environment of flappy bird
 from itertools import cycle
 import random
 import os
-
+import cv2
+import numpy
 import pygame
 from pygame.locals import *
 
@@ -76,8 +81,7 @@ class Environment:
         self.loopIter = 0
         self.playerIndex = 0
         self.player_index_gen = cycle([0, 1, 2, 1])
-        self.player_point = [int(self.width * 0.2), \
-                             int((self.height - self.player_height) / 2)]
+        self.player_point = [50, 256]
         ## bird motion information
         self.player_shm_vals = {'val': 0, 'dir': 1}
         ## player velocity, max velocity, downward accleration, accleration on flap
@@ -88,7 +92,7 @@ class Environment:
         self.playerFlapped = False # True when player flaps
         
         # init ground information
-        self.ground_point = [0, self.height*0.8]
+        self.ground_point = [0, 400]
         ## amount by which base can maximum shift to left
         self.ground_shift = self.ground_width - self.width
         ## pipe movement
@@ -111,7 +115,7 @@ class Environment:
             {'x': self.width + 200 + (self.width / 2), 'y': new_pipe2[1]['y']},
         ]
         
-        return self._get_state() 
+        return self._get_state()
     
     def step(self, action):
         # start iteration
@@ -252,6 +256,7 @@ class Environment:
         # y of gap between upper and lower pipe
         gap_y = random.randrange(0, int(self.ground_point[1] * 0.6 - self.pipe_gap))
         gap_y += int(self.player_point[1] * 0.2)
+        print('gap_y: %d' % (gap_y))
         pipe_height = self.pipe_height
         pipe_x = self.width + 10
     
@@ -347,3 +352,84 @@ class Environment:
                 mask[x].append(True)
         return mask
     """
+
+
+class Object:
+    def __init__(self, pic_path):
+        self.pos = [0, 0] # initial position
+        self.image = cv2.imread(pic_path) # 物体的图像
+        self.size = [self.image.shape[1], self.image.shape[0]] # 物体的宽和高
+
+class Background(Object):
+    def __init__(self, pic_path):
+        self.pos = [0, 0]
+        Object.__init__(self, pic_path)
+
+class Pipe(Object):
+    def __init__(self, pic_path, is_reverse=False):
+        Object.__init__(self, pic_path)
+        self.is_reverse = is_reverse # 是否是翻转的管道
+        self.image = cv2.flip(self.image, 0) if self.is_reverse else self.image
+        self.x_speed = -4 # 横向的平移量
+
+class Ground(Object):
+    def __init__(self, pic_path):
+        Object.__init__(self, pic_path)
+        self.pos = [0, 400]
+        self.x_shift = -4 # 横向的平移量
+
+class Bird(Object):
+
+    def __init__(self, pic_paths):
+        Object.__init__(self, pic_paths[0])
+        self.pos = [50, 256]
+        self.images = [cv2.imread(pic_path) for pic_path in pic_paths] # 鸟有3张图片
+        self.max_speed = 10 # 纵向的最大下落速度
+        self.accleration = 1 # 纵向的下落加速度
+        self.flapped_speed = -9 # 纵向的振翅上升速度
+        self.is_flapp = False # 是否振翅
+
+class Env:
+    
+    def __init__(self):
+        self.pipe_gap = 100
+        self.init_pipi_x = 200
+        
+        # 初始化物体
+        self.canvas = numpy.zeros(shape=(512, 288, 3), dtype='uint8')
+        self.background = Background('environment/flappy/background-black.png')
+        self.ground = Ground('environment/flappy/ground.png')
+        self.bird = Bird(['environment/flappy/bluebird-downflap.png',
+            'environment/flappy/bluebird-midflap.png', 
+            'environment/flappy/bluebird-upflap.png'])
+        self.bird.image = self.bird.images[1]
+        self.up_pipe = Pipe('environment/flappy/pipe-normal.png', is_reverse=True)
+        self.down_pipe = Pipe('environment/flappy/pipe-normal.png')
+        pipe_y = random.randint(80, 220)
+        self.up_pipe.pos = [self.init_pipi_x, pipe_y - self.up_pipe.size[1]]
+        self.down_pipe.pos = [self.init_pipi_x, pipe_y + self.pipe_gap]
+
+        # 将各个object放置在canvas中
+        self._set_object(self.canvas, self.background)
+        self._set_object(self.canvas, self.bird)
+        self._set_object(self.canvas, self.up_pipe)
+        self._set_object(self.canvas, self.down_pipe)
+        self._set_object(self.canvas, self.ground)
+        print(self.canvas.shape)
+        cv2.imwrite('D:/Downloads/test.png', self.canvas)
+
+    def _set_object(self, canvas, object):
+        print(object.pos, object.size, canvas.shape, object.image.shape)
+        target_left = max(0, object.pos[0])
+        target_right = min(object.pos[0] + object.size[0], canvas.shape[1])
+        target_top = max(0, object.pos[1])
+        target_bottom = min(object.pos[1] + object.size[1], canvas.shape[0])
+        source_left = target_left - object.pos[0]
+        source_right = target_right - object.pos[0]
+        source_top = target_top - object.pos[1]
+        source_bottom = target_bottom - object.pos[1]
+        canvas[target_top:target_bottom, target_left:target_right, :] = \
+            object.image[source_top:source_bottom, source_left:source_right, :]
+
+
+env = Env()
