@@ -370,13 +370,13 @@ class Pipe(Object):
         Object.__init__(self, pic_path)
         self.is_reverse = is_reverse # 是否是翻转的管道
         self.image = cv2.flip(self.image, 0) if self.is_reverse else self.image
-        self.x_speed = -4 # 横向的平移量
+        self.speed = -4 # 横向的平移量
 
 class Ground(Object):
     def __init__(self, pic_path):
         Object.__init__(self, pic_path)
         self.pos = [0, 400]
-        self.x_shift = -4 # 横向的平移量
+        self.speed = -100 # 横向的平移速度
 
 class Bird(Object):
 
@@ -392,34 +392,73 @@ class Bird(Object):
 class Env:
     
     def __init__(self):
+        self.width = 288
+        self.height = 512
         self.pipe_gap = 100
-        self.init_pipi_x = 200
+        self.n_frame = 0
+        self.pipe_queue = [] # 管道队列
+        self.pipe_path = 'environment/flappy/pipe-normal.png'
         
-        # 初始化物体
-        self.canvas = numpy.zeros(shape=(512, 288, 3), dtype='uint8')
+        # 初始化物体对象
+        self.canvas = numpy.zeros(shape=(self.height, self.width, 3), dtype='uint8')
         self.background = Background('environment/flappy/background-black.png')
         self.ground = Ground('environment/flappy/ground.png')
         self.bird = Bird(['environment/flappy/bluebird-downflap.png',
             'environment/flappy/bluebird-midflap.png', 
             'environment/flappy/bluebird-upflap.png'])
-        self.bird.image = self.bird.images[1]
-        self.up_pipe = Pipe('environment/flappy/pipe-normal.png', is_reverse=True)
-        self.down_pipe = Pipe('environment/flappy/pipe-normal.png')
-        pipe_y = random.randint(80, 220)
-        self.up_pipe.pos = [self.init_pipi_x, pipe_y - self.up_pipe.size[1]]
-        self.down_pipe.pos = [self.init_pipi_x, pipe_y + self.pipe_gap]
 
+        self.reset()
+
+    def reset(self):
+        self.n_frame = 0
+        self.pipe_queue = [] # 管道队列
+
+        # 初始化pipe
+        ## 初始化第一个pipe的位置
+        pipe_y = random.randint(80, 220)
+        up_pipe = Pipe(self.pipe_path, is_reverse=True)
+        up_pipe.pos = [self.width + 50, pipe_y - up_pipe.size[1]]
+        down_pipe = Pipe(self.pipe_path, is_reverse=False)
+        down_pipe.pos = [self.width + 50, pipe_y + self.pipe_gap]
+        self.pipe_queue.append([up_pipe, down_pipe])
+        ## 初始化第二个pipe的位置
+        pipe_y = random.randint(80, 220)
+        up_pipe = Pipe(self.pipe_path, is_reverse=True)
+        up_pipe.pos = [self.width + 200, pipe_y - up_pipe.size[1]]
+        down_pipe = Pipe(self.pipe_path, is_reverse=False)
+        down_pipe.pos = [self.width + 200, pipe_y + self.pipe_gap]
+        self.pipe_queue.append([up_pipe, down_pipe])
+
+        # 初始化bird
+        self.bird_indexs = [0, 1, 2, 1]
+        self.bird_index = 0
+        self.bird.image = self.bird.images[self.bird_indexs[self.bird_index]]
+
+        self.show(n_frame=self.n_frame)
+
+    def render(self):
+        # 变换到下一帧
+        self.n_frame += 1
+        
+        # 移动pipe
+        for up_pipe, down_pipe in self.pipe_queue:
+            up_pipe.pos[0] += up_pipe.speed
+            down_pipe.pos[0] += down_pipe.speed
+
+        self.show(n_frame=self.n_frame)
+
+    def show(self, n_frame=0):
         # 将各个object放置在canvas中
         self._set_object(self.canvas, self.background)
         self._set_object(self.canvas, self.bird)
-        self._set_object(self.canvas, self.up_pipe)
-        self._set_object(self.canvas, self.down_pipe)
+        for up_pipe, down_pipe in self.pipe_queue:
+            self._set_object(self.canvas, up_pipe)
+            self._set_object(self.canvas, down_pipe)
         self._set_object(self.canvas, self.ground)
         print(self.canvas.shape)
-        cv2.imwrite('D:/Downloads/test.png', self.canvas)
+        cv2.imwrite('D:/Downloads/flappy/%d.png' % (n_frame), self.canvas)
 
     def _set_object(self, canvas, object):
-        print(object.pos, object.size, canvas.shape, object.image.shape)
         target_left = max(0, object.pos[0])
         target_right = min(object.pos[0] + object.size[0], canvas.shape[1])
         target_top = max(0, object.pos[1])
@@ -428,8 +467,11 @@ class Env:
         source_right = target_right - object.pos[0]
         source_top = target_top - object.pos[1]
         source_bottom = target_bottom - object.pos[1]
-        canvas[target_top:target_bottom, target_left:target_right, :] = \
-            object.image[source_top:source_bottom, source_left:source_right, :]
+        if target_right >= 0 and target_left <= canvas.shape[1]:
+            canvas[target_top:target_bottom, target_left:target_right, :] = \
+                object.image[source_top:source_bottom, source_left:source_right, :]
 
 
 env = Env()
+for i in range(100):
+    env.render()
