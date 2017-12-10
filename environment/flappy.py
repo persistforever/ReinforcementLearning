@@ -398,6 +398,7 @@ class Env:
         self.n_frame = 0
         self.pipe_queue = [] # 管道队列
         self.pipe_path = 'environment/flappy/pipe-normal.png'
+        self.bird_index_gen = cycle([0, 1, 2, 1])
         
         # 初始化物体对象
         self.canvas = numpy.zeros(shape=(self.height, self.width, 3), dtype='uint8')
@@ -412,27 +413,17 @@ class Env:
     def reset(self):
         self.n_frame = 0
         self.pipe_queue = [] # 管道队列
+        random.seed(0)
 
         # 初始化pipe
         ## 初始化第一个pipe的位置
-        pipe_y = random.randint(80, 220)
-        up_pipe = Pipe(self.pipe_path, is_reverse=True)
-        up_pipe.pos = [self.width + 50, pipe_y - up_pipe.size[1]]
-        down_pipe = Pipe(self.pipe_path, is_reverse=False)
-        down_pipe.pos = [self.width + 50, pipe_y + self.pipe_gap]
-        self.pipe_queue.append([up_pipe, down_pipe])
+        self._push_pipe(x_pos=self.width+50)
         ## 初始化第二个pipe的位置
-        pipe_y = random.randint(80, 220)
-        up_pipe = Pipe(self.pipe_path, is_reverse=True)
-        up_pipe.pos = [self.width + 200, pipe_y - up_pipe.size[1]]
-        down_pipe = Pipe(self.pipe_path, is_reverse=False)
-        down_pipe.pos = [self.width + 200, pipe_y + self.pipe_gap]
-        self.pipe_queue.append([up_pipe, down_pipe])
+        self._push_pipe(x_pos=self.width+200)
 
         # 初始化bird
-        self.bird_indexs = [0, 1, 2, 1]
         self.bird_index = 0
-        self.bird.image = self.bird.images[self.bird_indexs[self.bird_index]]
+        self.bird.image = self.bird.images[self.bird_index]
 
         self.show(n_frame=self.n_frame)
 
@@ -444,6 +435,18 @@ class Env:
         for up_pipe, down_pipe in self.pipe_queue:
             up_pipe.pos[0] += up_pipe.speed
             down_pipe.pos[0] += down_pipe.speed
+        # 如果第二个pipe到达某一位置，产生新的pipe
+        if self.pipe_queue[-1][0].pos[0] <= 150:
+            self._push_pipe(x_pos=self.pipe_queue[-1][0].pos[0]+150)
+        # 如果第一个pipe到达某一位置，移除这个pipe
+        if self.pipe_queue[0][0].pos[0] <= -self.pipe_queue[0][0].size[0]:
+            self._pop_pipe()
+        print(len(self.pipe_queue))
+
+        # 获得bird的图片index
+        if self.n_frame % 3 == 0:
+            self.bird_index = self.bird_index_gen.next()
+        self.bird.image = self.bird.images[self.bird_index]
 
         self.show(n_frame=self.n_frame)
 
@@ -471,7 +474,18 @@ class Env:
             canvas[target_top:target_bottom, target_left:target_right, :] = \
                 object.image[source_top:source_bottom, source_left:source_right, :]
 
+    def _push_pipe(self, x_pos):
+        pipe_y = random.randint(80, 260)
+        up_pipe = Pipe(self.pipe_path, is_reverse=True)
+        up_pipe.pos = [x_pos, pipe_y - up_pipe.size[1]]
+        down_pipe = Pipe(self.pipe_path, is_reverse=False)
+        down_pipe.pos = [x_pos, pipe_y + self.pipe_gap]
+        self.pipe_queue.append([up_pipe, down_pipe])
+
+    def _pop_pipe(self):
+        del self.pipe_queue[0]
+
 
 env = Env()
-for i in range(100):
+for i in range(300):
     env.render()
