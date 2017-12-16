@@ -4,9 +4,12 @@
 # description: environment of flappy bird
 from itertools import cycle
 import random
+import time
 import os
 import cv2
 import numpy
+import matplotlib.pyplot as plt
+from matplotlib import animation
 import pygame
 from pygame.locals import *
 
@@ -355,39 +358,52 @@ class Environment:
 
 
 class Object:
-    def __init__(self, pic_path):
+    def __init__(self, pic_path, color, is_reverse=False):
         self.pos = [0, 0] # initial position
-        self.image = cv2.imread(pic_path) # 物体的图像
-        self.size = [self.image.shape[1], self.image.shape[0]] # 物体的宽和高
+        image = cv2.imread(pic_path)
+        self.size = [image.shape[1], image.shape[0]] # 物体的宽和高
+        self.surface = pygame.image.load(pic_path).convert_alpha()
+        if is_reverse:
+            self.surface = pygame.transform.rotate(self.surface, 180)
+        image_r = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[0]
+        image_g = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[1]
+        image_b = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[2]
+        self.image = numpy.concatenate([image_r, image_g, image_b], axis=2)
+        self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
 
 class Background(Object):
     def __init__(self, pic_path):
+        Object.__init__(self, pic_path, color=[35,35,35])
         self.pos = [0, 0]
-        Object.__init__(self, pic_path)
 
 class Pipe(Object):
     def __init__(self, pic_path, is_reverse=False):
-        Object.__init__(self, pic_path)
+        Object.__init__(self, pic_path, color=[67,205,128], is_reverse=is_reverse)
         self.is_reverse = is_reverse # 是否是翻转的管道
-        self.image = cv2.flip(self.image, 0) if self.is_reverse else self.image
         self.speed = -4 # 横向的平移量
+        self.is_passed = False # 管道是否被穿过
 
 class Ground(Object):
     def __init__(self, pic_path):
-        Object.__init__(self, pic_path)
+        Object.__init__(self, pic_path, color=[238,220,130])
         self.pos = [0, 400]
         self.speed = -100 # 横向的平移速度
 
+class Score(Object):
+    def __init__(self, pic_path):
+        Object.__init__(self, pic_path, color=[220,220,220])
+        self.pos = [120, 20]
+
 class Bird(Object):
 
-    def __init__(self, pic_paths):
-        Object.__init__(self, pic_paths[0])
+    def __init__(self, pic_path):
+        Object.__init__(self, pic_path, color=[65,105,225])
         self.pos = [50, 256]
-        self.images = [cv2.imread(pic_path) for pic_path in pic_paths] # 鸟有3张图片
-        self.max_speed = 10 # 纵向的最大下落速度
+        self.max_speed = 8 # 纵向的最大下落速度
         self.accleration = 1 # 纵向的下落加速度
-        self.flapped_speed = -9 # 纵向的振翅上升速度
-        self.is_flapp = False # 是否振翅
+        self.flap_speed = -6 # 纵向的振翅上升速度
+        self.speed = self.flap_speed # 纵向的速度
+        self.is_flap = False # 是否振翅
 
 class Env:
     
@@ -396,24 +412,42 @@ class Env:
         self.height = 512
         self.pipe_gap = 100
         self.n_frame = 0
+        self.max_nps = 35
         self.pipe_queue = [] # 管道队列
         self.pipe_path = 'environment/flappy/pipe-normal.png'
         self.bird_index_gen = cycle([0, 1, 2, 1])
+        self.score_paths = [
+            'environment/flappy/0.png', 'environment/flappy/1.png',
+            'environment/flappy/2.png', 'environment/flappy/3.png',
+            'environment/flappy/4.png', 'environment/flappy/5.png',
+            'environment/flappy/6.png', 'environment/flappy/7.png',
+            'environment/flappy/8.png', 'environment/flappy/9.png',]
+        self.score_start_x = 120 # 分数起始x
+        self.score_width = 24 # 分数宽度
         
-        # 初始化物体对象
-        self.canvas = numpy.zeros(shape=(self.height, self.width, 3), dtype='uint8')
-        self.background = Background('environment/flappy/background-black.png')
-        self.ground = Ground('environment/flappy/ground.png')
-        self.bird = Bird(['environment/flappy/bluebird-downflap.png',
-            'environment/flappy/bluebird-midflap.png', 
-            'environment/flappy/bluebird-upflap.png'])
-
         self.reset()
 
     def reset(self):
         self.n_frame = 0
         self.pipe_queue = [] # 管道队列
+        self.is_end = False
+        self.n_score = 0
         random.seed(0)
+
+        # 设置画图所需变量
+        pygame.init()
+        self.fps_clock = pygame.time.Clock()
+        self.window = pygame.display.set_mode((self.width, self.height))
+        pygame.display.set_caption('Flappy Bird')
+
+        # 初始化物体对象
+        self.canvas = numpy.zeros(shape=(self.height, self.width, 3), dtype='uint8')
+        self.background = Background('environment/flappy/background-day.png')
+        self.ground = Ground('environment/flappy/ground.png')
+        self.birds = [
+            Bird('environment/flappy/bluebird-downflap.png'),
+            Bird('environment/flappy/bluebird-midflap.png'),
+            Bird('environment/flappy/bluebird-upflap.png')]
 
         # 初始化pipe
         ## 初始化第一个pipe的位置
@@ -423,14 +457,18 @@ class Env:
 
         # 初始化bird
         self.bird_index = 0
-        self.bird.image = self.bird.images[self.bird_index]
+        self.bird = self.birds[self.bird_index]
+        self.bird.speed = self.bird.flap_speed
+        self.bird_flap = False
 
         self.show(n_frame=self.n_frame)
 
     def render(self):
-        # 变换到下一帧
-        self.n_frame += 1
-        
+        # 判断是否flap
+        for event in pygame.event.get():
+            if event.type == KEYDOWN and (event.key == K_SPACE or event.key == K_UP):
+                self.bird_flap = True
+
         # 移动pipe
         for up_pipe, down_pipe in self.pipe_queue:
             up_pipe.pos[0] += up_pipe.speed
@@ -441,16 +479,71 @@ class Env:
         # 如果第一个pipe到达某一位置，移除这个pipe
         if self.pipe_queue[0][0].pos[0] <= -self.pipe_queue[0][0].size[0]:
             self._pop_pipe()
-        print(len(self.pipe_queue))
 
         # 获得bird的图片index
         if self.n_frame % 3 == 0:
             self.bird_index = self.bird_index_gen.next()
-        self.bird.image = self.bird.images[self.bird_index]
+        self.bird = self.birds[self.bird_index]
+
+        # 更新bird的速度和位置
+        for bird in self.birds:
+            bird.is_flap = self.bird_flap
+            bird.pos[1] += bird.speed
+            if bird.speed < bird.max_speed and not bird.is_flap:
+                bird.speed += bird.accleration
+            elif bird.is_flap:
+                bird.speed = bird.flap_speed
+            elif bird.speed >= bird.max_speed:
+                bird.speed = bird.max_speed
+        self.bird_flap = False
+
+        # 碰撞检测
+        is_crash = False
+        ## 判断地板碰撞
+        if self._is_object_union(self.bird, self.ground):
+            is_crash = True
+            print(is_crash)
+        ## 判断和水管碰撞
+        for up_pipe, down_pipe in self.pipe_queue:
+            if self._is_object_union(self.bird, up_pipe):
+                is_crash = True
+            if self._is_object_union(self.bird, down_pipe):
+                is_crash = True
+        if is_crash:
+            self.is_end = True
+
+        # bird通过pipe检测
+        for up_pipe, down_pipe in self.pipe_queue:
+            if not down_pipe.is_passed:
+                if self.bird.pos[0] >= down_pipe.pos[0] + down_pipe.size[0]:
+                    down_pipe.is_passed = True
+                    self.n_score += 1
 
         self.show(n_frame=self.n_frame)
+        self.save_image(n_frame=self.n_frame)
+
+        # 变换到下一帧
+        self.n_frame += 1
 
     def show(self, n_frame=0):
+        # 画出物体
+        self.window.blit(self.background.surface, self.background.pos)
+        for up_pipe, down_pipe in self.pipe_queue:
+            self.window.blit(up_pipe.surface, up_pipe.pos)
+            self.window.blit(down_pipe.surface, down_pipe.pos)
+        self.window.blit(self.ground.surface, self.ground.pos)
+        self.window.blit(self.bird.surface, self.bird.pos)
+        # 画出分数
+        score_list = [int(t) for t in str(self.n_score)]
+        for i, score in enumerate(score_list):
+            s = Score(self.score_paths[score])
+            s.pos[0] = self.score_start_x + i * self.score_width
+            self.window.blit(s.surface, s.pos)
+
+        pygame.display.flip()
+        self.fps_clock.tick(self.max_nps)
+
+    def save_image(self, n_frame=0):
         # 将各个object放置在canvas中
         self._set_object(self.canvas, self.background)
         self._set_object(self.canvas, self.bird)
@@ -473,7 +566,7 @@ class Env:
         if target_right >= 0 and target_left <= canvas.shape[1]:
             canvas[target_top:target_bottom, target_left:target_right, :] = \
                 object.image[source_top:source_bottom, source_left:source_right, :]
-
+        
     def _push_pipe(self, x_pos):
         pipe_y = random.randint(80, 260)
         up_pipe = Pipe(self.pipe_path, is_reverse=True)
@@ -485,7 +578,31 @@ class Env:
     def _pop_pipe(self):
         del self.pipe_queue[0]
 
+    def _is_object_union(self, objecta, objectb):
+        lefta = objecta.pos[0]
+        righta = objecta.pos[0] + objecta.size[0]
+        topa = objecta.pos[1]
+        bottoma = objecta.pos[1] + objecta.size[1]
+
+        leftb = objectb.pos[0]
+        rightb = objectb.pos[0] + objectb.size[0]
+        topb = objectb.pos[1]
+        bottomb = objectb.pos[1] + objectb.size[1] 
+
+        union_left = max(lefta, leftb)
+        union_right = min(righta, rightb)
+        union_top = max(topa, topb)
+        union_bottom = min(bottoma, bottomb)
+
+        if union_right > union_left and union_bottom > union_top:
+            is_union = True
+        else:
+            is_union = False
+
+        return is_union
+
 
 env = Env()
-for i in range(300):
-    env.render()
+for i in range(1000):
+    if not env.is_end:
+        env.render()
