@@ -10,7 +10,7 @@ import cv2
 import numpy
 import matplotlib.pyplot as plt
 from matplotlib import animation
-import pygame
+# import pygame
 
 
 class Object:
