@@ -114,45 +114,45 @@ class Network:
 
 
 class QLearning:
-	def __init__(self):
-		self.env = Environment(is_show=False)
-		self.init_image = self.env.reset()
-		self.flap_prob = 0.1
+    def __init__(self):
+        self.env = Environment(is_show=False)
+        self.init_image = self.env.reset()
+        self.flap_prob = 0.1
         self.image_queue_maxsize = 4
-		self.replay_memory = []
-		self.replay_memory_maxsize = 5000
+        self.replay_memory = []
+        self.replay_memory_maxsize = 5000
         self.batch_size = 64
         self.n_history = self.image_queue_maxsize
         self.image_y_size = 512
         self.image_x_size = 288 
         self.n_channel = 3
         self.n_action = 2
-		
+        
         self.init_replay_memory()
         self.init_q_network()
-		for item in self.replay_memory:
-			print(len(item['state']), item['reward'], item['is_end'])
+        for item in self.replay_memory:
+            print(len(item['state']), item['reward'], item['is_end'])
 
-	def init_replay_memory(self):
-		image = self.init_image
-		image_queue = [image]
-		is_end = False
-		while not is_end:
-			rnd = random.random()
-			action = 'flap' if rnd < self.flap_prob else 'noflap'
-			next_image, reward, is_end = self.env.render(action)
-			# 如果image_queue满，则将当前状态存入replay_memory
-			if len(image_queue) >= self.image_queue_maxsize:
-				state = copy.deepcopy(image_queue)
-				image_queue.pop(0)
-				image_queue.append(next_image)
-				next_state = copy.deepcopy(image_queue)
-				self.replay_memory.append({
-					'state': state, 'action': action, 'reward': reward, 
-					'is_end': is_end, 'next_state': next_state})
-			else:
-				image_queue.append(next_image)
-			image = next_image
+    def init_replay_memory(self):
+        image = self.init_image
+        image_queue = [image]
+        is_end = False
+        while not is_end:
+            rnd = random.random()
+            action = 'flap' if rnd < self.flap_prob else 'noflap'
+            next_image, reward, is_end = self.env.render(action)
+            # 如果image_queue满，则将当前状态存入replay_memory
+            if len(image_queue) >= self.image_queue_maxsize:
+                state = copy.deepcopy(image_queue)
+                image_queue.pop(0)
+                image_queue.append(next_image)
+                next_state = copy.deepcopy(image_queue)
+                self.replay_memory.append({
+                    'state': state, 'action': action, 'reward': reward, 
+                    'is_end': is_end, 'next_state': next_state})
+            else:
+                image_queue.append(next_image)
+            image = next_image
 
     def init_q_network(self):
         # 创建placeholder
@@ -193,14 +193,14 @@ class QLearning:
     def train(self, n_episodes):
         for i in range(n_episodes):
             # 初始化trajectory
-		    init_image = self.env.reset()
+            init_image = self.env.reset()
             image = init_image
-		    image_queue = [image, image, image, image]
-		    is_end = False
+            image_queue = [image, image, image, image]
+            is_end = False
             n_step = 0
-		    while not is_end:
-				state = copy.deepcopy(image_queue)
-			    if random.random() < self.flap_prob:
+            while not is_end:
+                state = copy.deepcopy(image_queue)
+                if random.random() < self.flap_prob:
                     action = 'flap'
                 else:
                     self.max_action = self.q_netowork.get_max_action()
@@ -208,13 +208,13 @@ class QLearning:
                         fetches=[self.max_action], 
                         feed_dict={self.images: state})
                     action = max_action[0]
-			    next_image, reward, is_end = self.env.render(action)
-				image_queue.pop(0)
-				image_queue.append(next_image)
-				next_state = copy.deepcopy(image_queue)
-				self.replay_memory.append({
-					'state': state, 'action': action, 'reward': reward, 
-					'is_end': is_end, 'next_state': next_state})
+                next_image, reward, is_end = self.env.render(action)
+                image_queue.pop(0)
+                image_queue.append(next_image)
+                next_state = copy.deepcopy(image_queue)
+                self.replay_memory.append({
+                    'state': state, 'action': action, 'reward': reward, 
+                    'is_end': is_end, 'next_state': next_state})
                 
                 # 随机从replay_memory中取出1个batch
                 batch_images, batch_next_images, batch_actions, batch_rewards, batch_is_terminals = \
@@ -242,5 +242,5 @@ class QLearning:
 
 
 if __name__ == '__main__':
-	qlearning = QLearning()
+    qlearning = QLearning()
     qlearning.train(n_episodes=10000)
