@@ -171,6 +171,10 @@ class Environment:
         # 碰撞检测
         is_crash = False
         self.reward = 1
+        ## 判断天花板碰撞
+        if self.bird.pos[1] < 0:
+            is_crash = True
+            self.reward = -500
         ## 判断地板碰撞
         if self._is_object_union(self.bird, self.ground):
             is_crash = True
@@ -284,7 +288,9 @@ def main():
     env = Environment(is_show=False)
     for i in range(500):
         if not env.is_end:
-            env.render()
+            result = env.render(action='flap')
+            print(result[1], result[2])
+            cv2.imwrite('D://Downloads/flappy/%d.png' % (i), result[0])
 
 
 if __name__ == '__main__':
