@@ -8,9 +8,7 @@ import time
 import os
 import cv2
 import numpy
-import matplotlib.pyplot as plt
-from matplotlib import animation
-# import pygame
+import pygame
 
 
 class Object:
@@ -153,7 +151,7 @@ class Environment:
 
         # 获得bird的图片index
         if self.n_frame % 3 == 0:
-            self.bird_index = self.bird_index_gen.next()
+            self.bird_index = next(self.bird_index_gen)
         self.bird = self.birds[self.bird_index]
 
         # 更新bird的速度和位置

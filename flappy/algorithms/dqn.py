@@ -7,9 +7,9 @@ import os
 import random
 import time
 import numpy
-import Queue
 import copy
 import cv2
+import argparse
 import tensorflow as tf
 from environment.flappy import Environment
 from layer.conv_layer import ConvLayer
@@ -127,8 +127,8 @@ class Network:
 
 
 class QLearning:
-    def __init__(self):
-        self.env = Environment(is_show=False)
+    def __init__(self, is_show=False):
+        self.env = Environment(is_show=is_show)
         self.init_image = self.env.reset()
         self.flap_prob = 0.1
         self.epsilon = 1.0
@@ -141,11 +141,6 @@ class QLearning:
         self.image_x_size = 288 
         self.n_channel = 3
         self.n_action = 2
-        
-        self.init_replay_memory()
-        self.init_q_network()
-        for item in self.replay_memory:
-            print(len(item['state']), item['reward'], item['is_end'])
 
     def init_replay_memory(self):
         init_image = self.init_image
@@ -208,7 +203,12 @@ class QLearning:
         # 模型初始化
         self.sess.run(tf.global_variables_initializer())
 
-    def train(self, n_episodes, backup_dir):
+    def train(self, n_episodes, backup_dir):        
+        self.init_replay_memory()
+        self.init_q_network()
+        for item in self.replay_memory:
+            print(len(item['state']), item['reward'], item['is_end'])
+
         for n_episode in range(n_episodes):
             # 初始化trajectory
             init_image = self.env.reset()
@@ -266,7 +266,37 @@ class QLearning:
                 model_path = os.path.join(backup_dir, 'model_%d.ckpt' % (n_episode))
                 self.saver.save(self.sess, model_path)
 
+    def test(self, model_path):
+        self.init_q_network()
+        self.saver.restore(self.sess, model_path)
+
+        init_image = self.env.reset()
+        image_queue = [init_image, init_image, init_image, init_image]
+        is_end = False
+        while not is_end:
+            state = copy.deepcopy(image_queue)
+            state_np = numpy.array([state], dtype='float32')
+            max_action = self.sess.run(
+                fetches=[self.max_action], 
+                feed_dict={self.images: state_np})
+            action = 'flap' if max_action[0] == 0 else 'noflap'
+            next_image, reward, is_end = self.env.render(action)
+            image_queue.pop(0)
+            image_queue.append(next_image)
+
 
 if __name__ == '__main__':
-    qlearning = QLearning()
-    qlearning.train(n_episodes=10000, backup_dir='/home/caory/github/ReinforcementLearning/backup/flappy')
+    parser = argparse.ArgumentParser(description='parsing')
+    parser.add_argument('-method')
+    arg = parser.parse_args()
+    method = arg.method
+    if method == 'train':
+        main_dir = '/home/caory/github/ReinforcementLearning'
+        qlearning = QLearning(is_show=False)
+        qlearning.train(n_episodes=10000, 
+            backup_dir=os.path.join(main_dir, 'backup', 'flappy'))
+    elif method == 'test':
+        main_dir = 'D://Github/ReinforcementLearning'
+        qlearning = QLearning(is_show=True)
+        qlearning.test(
+            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_10000.ckpt'))
