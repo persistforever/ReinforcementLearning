@@ -47,9 +47,16 @@ class DenseLayer:
         if self.dropout:
             self.keep_prob = keep_prob
         
-    def get_output(self, input):
+        # 打印网络权重、输入、输出信息
         # calculate input_shape and output_shape
         self.output_shape = [self.input_shape[0], self.hidden_dim]
+        print('%-10s\t%-20s\t%-20s\t%s' % (
+            self.name, 
+            '(%d)' % (self.hidden_dim),
+            '(%d)' % (self.input_shape[1]),
+            '(%d)' % (self.output_shape[1])))
+        
+    def get_output(self, input):
         
         # hidden states
         intermediate = tf.matmul(input, self.weight)
@@ -79,13 +86,6 @@ class DenseLayer:
             self.output = self.leaky_relu(self.hidden)
         elif self.activation == 'none':
             self.output = self.hidden
-        
-        # 打印网络权重、输入、输出信息
-        print('%-10s\t%-20s\t%-20s\t%s' % (
-            self.name, 
-            '(%d)' % (self.hidden_dim),
-            '(%d)' % (self.input_shape[1]),
-            '(%d)' % (self.output_shape[1])))
         
         return self.output
     

@@ -2,6 +2,7 @@
 # author: ronniecao
 # time: 2017/12/17
 # description: DQN of flappy bird
+import sys
 import os
 import random
 import time
@@ -15,7 +16,7 @@ from layer.conv_layer import ConvLayer
 from layer.pool_layer import PoolLayer
 from layer.dense_layer import DenseLayer
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 
 class Network:
@@ -23,7 +24,10 @@ class Network:
         self.batch_size = batch_size
         self.n_history = n_history
         self.image_y_size = image_y_size
-        self.image_x_size = image_x_size 
+        self.image_x_size = image_x_size
+        self.cell_y_size = int(image_y_size / 32)
+        self.cell_x_size = int(image_x_size / 32)
+        self.final_dim = 128
         self.n_channel = n_channel
         self.n_action = n_action
         self.gamma = gamma
@@ -51,19 +55,19 @@ class Network:
             n_size=4, n_filter=128, stride=1, activation='relu', 
             batch_normal=True, weight_decay=5e-4, name='conv3')
         self.pool_layer3 = PoolLayer(
-            input_shape=(None, int(self.image_y_size/16), int(self.image_x_size/16), 128),
+            input_shape=(None, int(self.image_y_size/16), int(self.image_x_size/16), self.final_dim),
             n_size=2, stride=2, mode='max', resp_normal=False, name='pool3')
 
         self.dense_layer = DenseLayer(
             input_shape=(None, 
-                self.n_history * int(self.image_y_size/32) * int(self.image_x_size/32) * 128),
+                self.n_history * self.cell_y_size * self.cell_x_size * self.final_dim),
             hidden_dim=2, activation='relu', dropout=False,
-            keep_prob=None, batch_normal=False, weight_decay=None, name='dense'):
+            keep_prob=None, batch_normal=False, weight_decay=None, name='dense')
         
-        print()
+        print('')
         sys.stdout.flush()
     
-    def inference_body(self, index, n_history, images, outputs):
+    def inference_body(self, index, n_history, batch_size, images, outputs):
         # 数据流
         hidden_conv1 = self.conv_layer1.get_output(input=images[:,index,:,:,:])
         hidden_pool1 = self.pool_layer1.get_output(input=hidden_conv1)
@@ -73,33 +77,41 @@ class Network:
         hidden_pool3 = self.pool_layer3.get_output(input=hidden_conv3)
 
         hidden_pool3 = tf.reshape(hidden_pool3, shape=(
-            None, 1, int(self.image_y_size/32), int(self.image_x_size/32), 128))
+            batch_size, 1, self.cell_y_size, self.cell_x_size, self.final_dim))
         output = tf.pad(hidden_pool3, paddings=[
             [0,0], [index,n_history-index-1], [0,0], [0,0], [0,0]], mode='CONSTANT')
         outputs += output
 
         index += 1
 
-        return index, n_history, images, outputs
+        return index, n_history, batch_size, images, outputs
 
-    def get_inference(self):
-        outputs = tf.zeros(shape=(None, self.n_history, 
-            int(self.image_y_size/32), int(self.image_x_size/32), 128), dtype=tf.float32)
-        results = tf.while_loop(cond=lambda i,n,im,out: i<n, body=self.inference_body,
-            loop_vars=[tf.constant(0), self.n_history, self.images, outputs])
-        hidden_output = results[3]
+    def get_inference(self, images, batch_size=1):
+        outputs = tf.zeros(shape=(batch_size, self.n_history,
+            self.cell_y_size, self.cell_x_size, self.final_dim), dtype=tf.float32)
+        results = tf.while_loop(
+            cond=lambda i,n,b,im,out: i<n, body=self.inference_body,
+            loop_vars=[tf.constant(0), self.n_history, batch_size, images, outputs],
+            parallel_iterations=self.batch_size, 
+            shape_invariants=[
+                tf.TensorShape(()), tf.TensorShape(()), tf.TensorShape(()),
+                tf.TensorShape((None, self.n_history,
+                    self.image_y_size, self.image_x_size, self.n_channel)),
+                tf.TensorShape((None, self.n_history,
+                    self.cell_y_size, self.cell_x_size, self.final_dim))])
+        hidden_output = results[4]
         hidden_output = tf.reshape(hidden_output, (
-            None, self.n_history * int(self.image_y_size/32) * int(self.image_x_size/32) * 128))
+            batch_size, self.n_history * self.cell_y_size * self.cell_x_size * self.final_dim))
         hidden_dense = self.dense_layer.get_output(input=hidden_output)
         action_prob = tf.nn.softmax(hidden_dense)
 
         return action_prob
 
     def get_loss(self, images, actions, rewards, next_images, is_terminals):
-        next_action_prob = self.get_inference(next_images)
-        max_action_prob = tf.reduce_max(next_action_prob, axis=1, keep_dims=False)
-        labels = tf.stop_gradients(rewards + self.gamma * max_action_prob * is_terminals)
-        preds = self.get_inference(images)
+        next_action_prob = self.get_inference(next_images, batch_size=self.batch_size)
+        max_action_prob = tf.reduce_max(next_action_prob, axis=1, keep_dims=True)
+        labels = tf.stop_gradient(rewards + self.gamma * max_action_prob * is_terminals)
+        preds = self.get_inference(images, batch_size=self.batch_size)
         loss = tf.nn.l2_loss(labels - preds)
         tf.add_to_collection('losses', loss / self.batch_size)
         avg_loss = tf.add_n(tf.get_collection('losses'))
@@ -107,7 +119,7 @@ class Network:
         return avg_loss
 
     def get_max_action(self, image):
-        action_prob = self.get_inference(image)
+        action_prob = self.get_inference(image, batch_size=1)
         max_action = tf.argmax(action_prob, axis=1)
 
         return max_action
@@ -135,23 +147,19 @@ class QLearning:
 
     def init_replay_memory(self):
         image = self.init_image
-        image_queue = [image]
+        image_queue = [image, image, image, image]
         is_end = False
         while not is_end:
             rnd = random.random()
             action = 'flap' if rnd < self.flap_prob else 'noflap'
             next_image, reward, is_end = self.env.render(action)
-            # 如果image_queue满，则将当前状态存入replay_memory
-            if len(image_queue) >= self.image_queue_maxsize:
-                state = copy.deepcopy(image_queue)
-                image_queue.pop(0)
-                image_queue.append(next_image)
-                next_state = copy.deepcopy(image_queue)
-                self.replay_memory.append({
-                    'state': state, 'action': action, 'reward': reward, 
-                    'is_end': is_end, 'next_state': next_state})
-            else:
-                image_queue.append(next_image)
+            state = copy.deepcopy(image_queue)
+            image_queue.pop(0)
+            image_queue.append(next_image)
+            next_state = copy.deepcopy(image_queue)
+            self.replay_memory.append({
+                'state': state, 'action': action, 'reward': reward, 
+                'is_end': is_end, 'next_state': next_state})
             image = next_image
 
     def init_q_network(self):
@@ -166,15 +174,15 @@ class QLearning:
             name='next_images')
         self.actions = tf.placeholder(
             dtype=tf.int32, shape=[
-                None, self.n_action],
+                self.batch_size, self.n_action],
             name='actions')
         self.rewards = tf.placeholder(
             dtype=tf.float32, shape=[
-                None, 1],
+                self.batch_size, 1],
             name='rewards')
         self.is_terminals = tf.placeholder(
             dtype=tf.float32, shape=[
-                None, 1],
+                self.batch_size, 1],
             name='is_terminals')
         self.global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
         
@@ -187,8 +195,17 @@ class QLearning:
         
         # 构建优化器
         self.optimizer = tf.train.MomentumOptimizer(learning_rate=0.001, momentum=0.9)
-        self.avg_loss = self.q_network.get_loss()
+        self.avg_loss = self.q_network.get_loss(
+            self.images, self.actions, self.rewards, self.next_images, self.is_terminals)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
+        # 构建预测器
+        self.max_action = self.q_network.get_max_action(self.images)
+        
+        # 模型保存器
+        self.saver = tf.train.Saver(
+            var_list=tf.global_variables(), write_version=tf.train.SaverDef.V2, max_to_keep=50)
+        # 模型初始化
+        self.sess.run(tf.global_variables_initializer())
 
     def train(self, n_episodes):
         for i in range(n_episodes):
@@ -201,13 +218,14 @@ class QLearning:
             while not is_end:
                 state = copy.deepcopy(image_queue)
                 if random.random() < self.flap_prob:
-                    action = 'flap'
+                    action = 'flap' if random.random() < 0.5 else 'noflap'
                 else:
-                    self.max_action = self.q_netowork.get_max_action()
+                    state_np = numpy.array([state], dtype='float32')
                     max_action = self.sess.run(
                         fetches=[self.max_action], 
-                        feed_dict={self.images: state})
-                    action = max_action[0]
+                        feed_dict={self.images: state_np})
+                    print('max_action', max_action)
+                    action = 'flap' if max_action[0] == 0 else 'noflap'
                 next_image, reward, is_end = self.env.render(action)
                 image_queue.pop(0)
                 image_queue.append(next_image)
@@ -224,9 +242,9 @@ class QLearning:
                     item = self.replay_memory[index]
                     batch_images.append(item['state'])
                     batch_next_images.append(item['next_state'])
-                    batch_actions.append(item['action'])
-                    batch_rewars.append(item['reward'])
-                    batch_is_terminals.append(0.0 if item['is_end'] else 1.0)
+                    batch_actions.append([1, 0] if item['action'] == 'flap' else [0, 1])
+                    batch_rewards.append([item['reward']])
+                    batch_is_terminals.append([0.0 if item['is_end'] else 1.0])
                 batch_images = numpy.array(batch_images, dtype='float32')
                 batch_next_images = numpy.array(batch_next_images, dtype='float32')
                 batch_actions = numpy.array(batch_actions, dtype='int32')
