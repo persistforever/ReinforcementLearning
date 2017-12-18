@@ -74,10 +74,5 @@ target/
 
 # Data files #
 ######################
-/data/
-/result/
-<<<<<<< HEAD
-/to_yanan/
-=======
-/to_yanan2/
->>>>>>> branch 'master' of https://persistforever@bitbucket.org/persistforever/sentencessimilarity.git
+/logs/
+/backup/

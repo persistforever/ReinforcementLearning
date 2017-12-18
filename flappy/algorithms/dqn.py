@@ -16,7 +16,7 @@ from layer.conv_layer import ConvLayer
 from layer.pool_layer import PoolLayer
 from layer.dense_layer import DenseLayer
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 class Network:
