@@ -170,23 +170,23 @@ class Environment:
 
         # 碰撞检测
         is_crash = False
-        self.reward = 1
+        self.reward = 0
         ## 判断天花板碰撞
         if self.bird.pos[1] < 0:
             is_crash = True
-            self.reward = -500
+            self.reward = -1
         ## 判断地板碰撞
         if self._is_object_union(self.bird, self.ground):
             is_crash = True
-            self.reward = -500
+            self.reward = -1
         ## 判断和水管碰撞
         for up_pipe, down_pipe in self.pipe_queue:
             if self._is_object_union(self.bird, up_pipe):
                 is_crash = True
-                self.reward = -50
+                self.reward = -1
             if self._is_object_union(self.bird, down_pipe):
                 is_crash = True
-                self.reward = -50
+                self.reward = -1
         if is_crash:
             self.is_end = True
 
@@ -196,7 +196,7 @@ class Environment:
                 if self.bird.pos[0] >= down_pipe.pos[0] + down_pipe.size[0]:
                     down_pipe.is_passed = True
                     self.n_score += 1
-                    self.reward = 50
+                    self.reward = 1
 
         if self.is_show:
             self.show(n_frame=self.n_frame)

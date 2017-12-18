@@ -87,6 +87,11 @@ class DenseLayer:
         elif self.activation == 'none':
             self.output = self.hidden
         
+        # gradient constraint
+        g = tf.get_default_graph()
+        with g.gradient_override_map({"Identity": "CustomClipGrad"}):
+            self.output = tf.identity(self.output, name="Identity")
+        
         return self.output
     
     def leaky_relu(self, input):

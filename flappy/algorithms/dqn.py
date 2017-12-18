@@ -34,34 +34,34 @@ class Network:
 
         # 网络结构
         print('\n%-10s\t%-20s\t%-20s\t%s' % ('Name', 'Filter', 'Input', 'Output')) 
+        self.pool_layer1 = PoolLayer(
+            input_shape=(None, self.image_y_size, self.image_x_size, self.n_channel),
+            n_size=4, stride=4, mode='max', resp_normal=False, name='pool1')
         self.conv_layer1 = ConvLayer(
-            input_shape=(None, self.image_y_size, self.image_x_size, self.n_channel), 
+            input_shape=(None, int(self.image_y_size/4), int(self.image_x_size/4), self.n_channel), 
             n_size=4, n_filter=32, stride=1, activation='relu', 
             batch_normal=True, weight_decay=5e-4, name='conv1')
-        self.pool_layer1 = PoolLayer(
-            input_shape=(None, self.image_y_size, self.image_x_size, 32),
-            n_size=4, stride=4, mode='max', resp_normal=False, name='pool1')
         
+        self.pool_layer2 = PoolLayer(
+            input_shape=(None, int(self.image_y_size/4), int(self.image_x_size/4), 32),
+            n_size=4, stride=4, mode='max', resp_normal=False, name='pool2')
         self.conv_layer2 = ConvLayer(
-            input_shape=(None, int(self.image_y_size/4), int(self.image_x_size/4), 32), 
+            input_shape=(None, int(self.image_y_size/16), int(self.image_x_size/16), 32), 
             n_size=4, n_filter=64, stride=1, activation='relu', 
             batch_normal=True, weight_decay=5e-4, name='conv2')
-        self.pool_layer2 = PoolLayer(
-            input_shape=(None, int(self.image_y_size/4), int(self.image_x_size/4), 64),
-            n_size=4, stride=4, mode='max', resp_normal=False, name='pool2')
-
-        self.conv_layer3 = ConvLayer(
-            input_shape=(None, int(self.image_y_size/16), int(self.image_x_size/16), 64), 
-            n_size=4, n_filter=128, stride=1, activation='relu', 
-            batch_normal=True, weight_decay=5e-4, name='conv3')
+        
         self.pool_layer3 = PoolLayer(
-            input_shape=(None, int(self.image_y_size/16), int(self.image_x_size/16), self.final_dim),
+            input_shape=(None, int(self.image_y_size/16), int(self.image_x_size/16), 64),
             n_size=2, stride=2, mode='max', resp_normal=False, name='pool3')
+        self.conv_layer3 = ConvLayer(
+            input_shape=(None, int(self.image_y_size/32), int(self.image_x_size/32), 64), 
+            n_size=4, n_filter=self.final_dim, stride=1, activation='relu', 
+            batch_normal=True, weight_decay=5e-4, name='conv3')
 
         self.dense_layer = DenseLayer(
             input_shape=(None, 
                 self.n_history * self.cell_y_size * self.cell_x_size * self.final_dim),
-            hidden_dim=2, activation='relu', dropout=False,
+            hidden_dim=2, activation='none', dropout=False,
             keep_prob=None, batch_normal=False, weight_decay=None, name='dense')
         
         print('')
@@ -69,16 +69,16 @@ class Network:
     
     def inference_body(self, index, n_history, batch_size, images, outputs):
         # 数据流
-        hidden_conv1 = self.conv_layer1.get_output(input=images[:,index,:,:,:])
-        hidden_pool1 = self.pool_layer1.get_output(input=hidden_conv1)
-        hidden_conv2 = self.conv_layer2.get_output(input=hidden_pool1)
-        hidden_pool2 = self.pool_layer2.get_output(input=hidden_conv2)
-        hidden_conv3 = self.conv_layer3.get_output(input=hidden_pool2)
-        hidden_pool3 = self.pool_layer3.get_output(input=hidden_conv3)
+        hidden_pool1 = self.pool_layer1.get_output(input=images[:,index,:,:,:])
+        hidden_conv1 = self.conv_layer1.get_output(input=hidden_pool1)
+        hidden_pool2 = self.pool_layer2.get_output(input=hidden_conv1)
+        hidden_conv2 = self.conv_layer2.get_output(input=hidden_pool2)
+        hidden_pool3 = self.pool_layer3.get_output(input=hidden_conv2)
+        hidden_conv3 = self.conv_layer3.get_output(input=hidden_pool3)
 
-        hidden_pool3 = tf.reshape(hidden_pool3, shape=(
+        hidden_conv3 = tf.reshape(hidden_conv3, shape=(
             batch_size, 1, self.cell_y_size, self.cell_x_size, self.final_dim))
-        output = tf.pad(hidden_pool3, paddings=[
+        output = tf.pad(hidden_conv3, paddings=[
             [0,0], [index,n_history-index-1], [0,0], [0,0], [0,0]], mode='CONSTANT')
         outputs += output
 
@@ -103,15 +103,16 @@ class Network:
         hidden_output = tf.reshape(hidden_output, (
             batch_size, self.n_history * self.cell_y_size * self.cell_x_size * self.final_dim))
         hidden_dense = self.dense_layer.get_output(input=hidden_output)
-        action_prob = tf.nn.softmax(hidden_dense)
 
-        return action_prob
+        return hidden_dense
 
     def get_loss(self, images, actions, rewards, next_images, is_terminals):
         next_action_prob = self.get_inference(next_images, batch_size=self.batch_size)
         max_action_prob = tf.reduce_max(next_action_prob, axis=1, keep_dims=True)
         labels = tf.stop_gradient(rewards + self.gamma * max_action_prob * is_terminals)
         preds = self.get_inference(images, batch_size=self.batch_size)
+        actions = tf.cast(actions, dtype=tf.float32)
+        preds = preds * actions
         loss = tf.nn.l2_loss(labels - preds)
         tf.add_to_collection('losses', loss / self.batch_size)
         avg_loss = tf.add_n(tf.get_collection('losses'))
@@ -130,6 +131,7 @@ class QLearning:
         self.env = Environment(is_show=False)
         self.init_image = self.env.reset()
         self.flap_prob = 0.1
+        self.epsilon = 1.0
         self.image_queue_maxsize = 4
         self.replay_memory = []
         self.replay_memory_maxsize = 5000
@@ -146,8 +148,8 @@ class QLearning:
             print(len(item['state']), item['reward'], item['is_end'])
 
     def init_replay_memory(self):
-        image = self.init_image
-        image_queue = [image, image, image, image]
+        init_image = self.init_image
+        image_queue = [init_image, init_image, init_image, init_image]
         is_end = False
         while not is_end:
             rnd = random.random()
@@ -160,7 +162,6 @@ class QLearning:
             self.replay_memory.append({
                 'state': state, 'action': action, 'reward': reward, 
                 'is_end': is_end, 'next_state': next_state})
-            image = next_image
 
     def init_q_network(self):
         # 创建placeholder
@@ -194,7 +195,7 @@ class QLearning:
             n_channel=3, n_action=2, gamma=0.9)
         
         # 构建优化器
-        self.optimizer = tf.train.MomentumOptimizer(learning_rate=0.001, momentum=0.9)
+        self.optimizer = tf.train.MomentumOptimizer(learning_rate=0.1, momentum=0.9)
         self.avg_loss = self.q_network.get_loss(
             self.images, self.actions, self.rewards, self.next_images, self.is_terminals)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
@@ -207,25 +208,25 @@ class QLearning:
         # 模型初始化
         self.sess.run(tf.global_variables_initializer())
 
-    def train(self, n_episodes):
-        for i in range(n_episodes):
+    def train(self, n_episodes, backup_dir):
+        for n_episode in range(n_episodes):
             # 初始化trajectory
             init_image = self.env.reset()
-            image = init_image
-            image_queue = [image, image, image, image]
+            image_queue = [init_image, init_image, init_image, init_image]
             is_end = False
             n_step = 0
             while not is_end:
                 state = copy.deepcopy(image_queue)
-                if random.random() < self.flap_prob:
-                    action = 'flap' if random.random() < 0.5 else 'noflap'
+                if random.random() < self.epsilon:
+                    action = 'flap' if random.random() < self.flap_prob else 'noflap'
                 else:
                     state_np = numpy.array([state], dtype='float32')
                     max_action = self.sess.run(
                         fetches=[self.max_action], 
                         feed_dict={self.images: state_np})
-                    print('max_action', max_action)
                     action = 'flap' if max_action[0] == 0 else 'noflap'
+                self.epsilon = max(self.epsilon - 0.001, 0.1)
+                print('action', action)
                 next_image, reward, is_end = self.env.render(action)
                 image_queue.pop(0)
                 image_queue.append(next_image)
@@ -250,16 +251,22 @@ class QLearning:
                 batch_actions = numpy.array(batch_actions, dtype='int32')
                 batch_rewards = numpy.array(batch_rewards, dtype='float32')
                 batch_is_terminals = numpy.array(batch_is_terminals, dtype='float32')
-                [avg_loss] = self.sess.run(
-                    fetches=[self.avg_loss],
+                [_, avg_loss] = self.sess.run(
+                    fetches=[self.optimizer_handle, self.avg_loss],
                     feed_dict={
                         self.images: batch_images, self.next_images: batch_next_images,
                         self.actions: batch_actions, self.rewards: batch_rewards, 
                         self.is_terminals: batch_is_terminals})
-                print('[%d-%d] avg_loss: %.6f' % (i, n_step, avg_loss))
+                print('[%d-%d] avg_loss: %.6f' % (n_episode, n_step, avg_loss))
                 n_step += 1
+            
+            # trajectory结束后保存模型
+            if (n_episode <= 1000 and n_episode % 200 == 0) or (1000 < n_episode <= 10000 and n_episode % 2000 == 0) \
+                or (n_episode > 10000 and n_episode % 20000 == 0):
+                model_path = os.path.join(backup_dir, 'model_%d.ckpt' % (n_episode))
+                self.saver.save(self.sess, model_path)
 
 
 if __name__ == '__main__':
     qlearning = QLearning()
-    qlearning.train(n_episodes=10000)
+    qlearning.train(n_episodes=10000, backup_dir='/home/caory/github/ReinforcementLearning/backup/flappy')
