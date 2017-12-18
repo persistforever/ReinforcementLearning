@@ -16,7 +16,7 @@ from layer.conv_layer import ConvLayer
 from layer.pool_layer import PoolLayer
 from layer.dense_layer import DenseLayer
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
 class Network:
@@ -133,7 +133,7 @@ class QLearning:
         self.image_queue_maxsize = 4
         self.replay_memory = []
         self.replay_memory_maxsize = 5000
-        self.batch_size = 64
+        self.batch_size = 32
         self.n_history = self.image_queue_maxsize
         self.image_y_size = 512
         self.image_x_size = 288 
@@ -190,7 +190,7 @@ class QLearning:
         gpu_options = tf.GPUOptions(allow_growth=True)
         self.sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         self.q_network = Network(
-            batch_size=64, n_history=self.image_queue_maxsize, image_y_size=512, image_x_size=288,
+            batch_size=32, n_history=self.image_queue_maxsize, image_y_size=512, image_x_size=288,
             n_channel=3, n_action=2, gamma=0.9)
         
         # 构建优化器
@@ -257,6 +257,7 @@ class QLearning:
                         self.actions: batch_actions, self.rewards: batch_rewards, 
                         self.is_terminals: batch_is_terminals})
                 print('[%d-%d] avg_loss: %.6f' % (i, n_step, avg_loss))
+                n_step += 1
 
 
 if __name__ == '__main__':
