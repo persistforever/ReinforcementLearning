@@ -272,16 +272,17 @@ if __name__ == '__main__':
     parser.add_argument('-gpus')
     arg = parser.parse_args()
     method = arg.method
-    gpus = arg.gpus
-    os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     
     if method == 'train':
+        gpus = arg.gpus
+        os.environ['CUDA_VISIBLE_DEVICES'] = gpus
         main_dir = '/home/caory/github/ReinforcementLearning'
         qlearning = QLearning(is_show=False)
         qlearning.train(n_episodes=1000, 
             backup_dir=os.path.join(main_dir, 'backup', 'flappy'))
     elif method == 'test':
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
         main_dir = 'D://Github/ReinforcementLearning'
         qlearning = QLearning(is_show=True)
         qlearning.test(
-            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_10000.ckpt'))
+            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_150.ckpt'))
