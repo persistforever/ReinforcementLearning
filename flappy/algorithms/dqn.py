@@ -81,7 +81,6 @@ class Network:
         output = tf.pad(hidden_conv3, paddings=[
             [0,0], [index,n_history-index-1], [0,0], [0,0], [0,0]], mode='CONSTANT')
         outputs += output
-
         index += 1
 
         return index, n_history, batch_size, images, outputs
@@ -123,7 +122,7 @@ class Network:
         action_prob = self.get_inference(image, batch_size=1)
         max_action = tf.argmax(action_prob, axis=1)
 
-        return max_action
+        return max_action, action_prob
 
 
 class QLearning:
@@ -195,7 +194,7 @@ class QLearning:
             self.images, self.actions, self.rewards, self.next_images, self.is_terminals)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
         # 构建预测器
-        self.max_action = self.q_network.get_max_action(self.images)
+        self.max_action, self.action_prob = self.q_network.get_max_action(self.images)
         
         # 模型保存器
         self.saver = tf.train.Saver(
@@ -276,9 +275,10 @@ class QLearning:
         while not is_end:
             state = copy.deepcopy(image_queue)
             state_np = numpy.array([state], dtype='float32')
-            max_action = self.sess.run(
-                fetches=[self.max_action], 
+            max_action, action_prob = self.sess.run(
+                fetches=[self.max_action, self.action_prob], 
                 feed_dict={self.images: state_np})
+            print(max_action, action_prob)
             action = 'flap' if max_action[0] == 0 else 'noflap'
             next_image, reward, is_end = self.env.render(action)
             image_queue.pop(0)
