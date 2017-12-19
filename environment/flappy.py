@@ -8,7 +8,7 @@ import time
 import os
 import cv2
 import numpy
-import pygame
+# import pygame
 
 
 class Object:
@@ -168,7 +168,7 @@ class Environment:
 
         # 碰撞检测
         is_crash = False
-        self.reward = 0
+        self.reward = 0.1
         ## 判断天花板碰撞
         if self.bird.pos[1] < 0:
             is_crash = True
