@@ -55,9 +55,9 @@ class Bird(Object):
     def __init__(self, pic_path, is_show=False):
         Object.__init__(self, pic_path, color=[65,105,225], is_show=is_show)
         self.pos = [50, 256]
-        self.max_speed = 8 # 纵向的最大下落速度
+        self.max_speed = 10 # 纵向的最大下落速度
         self.accleration = 1 # 纵向的下落加速度
-        self.flap_speed = -6 # 纵向的振翅上升速度
+        self.flap_speed = -9 # 纵向的振翅上升速度
         self.speed = self.flap_speed # 纵向的速度
         self.is_flap = False # 是否振翅
 
@@ -69,7 +69,7 @@ class Environment:
 
         self.width = 288
         self.height = 512
-        self.pipe_gap = 100
+        self.pipe_gap = 200
         self.n_frame = 0
         self.max_nps = 35
         self.pipe_queue = [] # 管道队列
@@ -91,6 +91,7 @@ class Environment:
         self.pipe_queue = [] # 管道队列
         self.is_end = False
         self.n_score = 0
+        self.reward = 0
         # random.seed(0)
 
         # 设置画图所需变量
@@ -157,13 +158,13 @@ class Environment:
         # 更新bird的速度和位置
         for bird in self.birds:
             bird.is_flap = self.bird_flap
-            bird.pos[1] += bird.speed
             if bird.speed < bird.max_speed and not bird.is_flap:
                 bird.speed += bird.accleration
             elif bird.is_flap:
                 bird.speed = bird.flap_speed
             elif bird.speed >= bird.max_speed:
                 bird.speed = bird.max_speed
+            bird.pos[1] += bird.speed
         self.bird_flap = False
 
         # 碰撞检测
@@ -248,7 +249,7 @@ class Environment:
                 object.image[source_top:source_bottom, source_left:source_right, :]
         
     def _push_pipe(self, x_pos):
-        pipe_y = random.randint(80, 260)
+        pipe_y = random.randint(80, 180)
         up_pipe = Pipe(self.pipe_path, is_reverse=True, is_show=self.is_show)
         up_pipe.pos = [x_pos, pipe_y - up_pipe.size[1]]
         down_pipe = Pipe(self.pipe_path, is_reverse=False, is_show=self.is_show)

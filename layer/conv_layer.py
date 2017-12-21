@@ -19,6 +19,7 @@ class ConvLayer:
         self.batch_normal = batch_normal
         self.weight_decay = weight_decay
         self.name = name
+        self.variables = []
         
         self.leaky_scale = tf.constant(0.1, dtype=tf.float32)
     
@@ -26,8 +27,9 @@ class ConvLayer:
             # 权重矩阵
             scale = math.sqrt(2.0 / (self.n_size * self.n_size * self.input_shape[3]))
             init_value = scale * numpy.random.normal(size=[
-                self.n_size, self.n_size, self.input_shape[3], self.n_filter], loc=0.0, scale=1.0)
+                self.n_size, self.n_size, self.input_shape[3], self.n_filter], loc=0.0, scale=0.01)
             self.weight = tf.Variable(init_value, dtype=tf.float32, name='weight')
+            self.variables.append(self.weight)
             if self.weight_decay:
                 weight_decay = tf.multiply(tf.nn.l2_loss(self.weight), self.weight_decay, name='weight_decay_loss')
                 tf.add_to_collection('losses', weight_decay)
@@ -36,6 +38,7 @@ class ConvLayer:
             self.bias = tf.Variable(
                 initial_value=tf.constant(0.0, shape=[self.n_filter]),
                 name='bias')
+            self.variables.append(self.bias)
         
             # batch normalization 技术的参数
             if self.batch_normal:
@@ -43,6 +46,7 @@ class ConvLayer:
                 self.gamma = tf.Variable(
                     initial_value=tf.constant(1.0, shape=[self.n_filter]),
                     name='gamma')
+                self.variables.append(self.gamma)
         
         # 打印网络权重、输入、输出信息
         # calculate input_shape and output_shape
