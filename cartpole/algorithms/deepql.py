@@ -64,6 +64,16 @@ class Network:
 
         return avg_loss
 
+    def get_loss1(self, states, actions, labels):
+        action_score = self.get_inference(states, batch_size=self.batch_size)
+        actions = tf.cast(actions, dtype=tf.float32)
+        preds = tf.reduce_sum(action_score * tf.stop_gradient(actions), axis=1, keep_dims=True)
+        loss = tf.nn.l2_loss(labels - preds)
+        tf.add_to_collection('losses', loss / self.batch_size)
+        avg_loss = tf.add_n(tf.get_collection('losses'))
+
+        return avg_loss
+
 
 class QLearning:
     
@@ -125,9 +135,13 @@ class QLearning:
             dtype=tf.float32, shape=[
                 None, 4],
             name='states')
+        self.acs = tf.placeholder(
+            dtype=tf.float32, shape=[
+                None,2],
+            name='actions')
         self.labels = tf.placeholder(
         	dtype=tf.float32, shape=[
-        		None,2],
+        		None,1],
         	name='labels')
 
         # 构建会话和Network对象
@@ -139,7 +153,7 @@ class QLearning:
 
         # 构建优化器
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=0.01)
-        self.avg_loss = self.q_network.get_loss(self.states, self.labels)
+        self.avg_loss = self.q_network.get_loss1(self.states, self.acs, self.labels)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss)
         # 构建预测器
         self.action_score = self.q_network.get_inference(self.states, batch_size=1)
@@ -161,23 +175,32 @@ class QLearning:
         batch_data = random.sample(self.memory, batch_size)
         X = numpy.zeros((batch_size, self.state_size))
         Y = numpy.zeros((batch_size, len(self.actions)))
+        actions = numpy.zeros((batch_size, len(self.actions)))
+        labels = numpy.zeros((batch_size, 1))
         for i in range(batch_size):
             state, action, reward, next_state, done = batch_data[i]
             action_score = self.sess.run(self.action_score, feed_dict={
                 self.states: state})
             target = action_score[0]
+            if action == 0:
+                actions[i,:] = [1, 0]
+            else:
+                actions[i,:] = [0, 1]
             if done:
                 target[action] = reward
+                labels[i,0] = reward
             else:
                 action_score = self.sess.run(self.action_score, feed_dict={
                     self.states: next_state})
                 # target[action] = reward + self.gamma * numpy.amax(self.model.predict(next_state)[0])
                 target[action] = reward + self.gamma * numpy.amax(action_score[0])
+                labels[i,0] = reward + self.gamma * numpy.amax(action_score[0])
             X[i], Y[i] = state, target
+        # print(actions, labels)
         
         [_, avg_loss] = self.sess.run(
             fetches=[self.optimizer_handle, self.avg_loss],
-            feed_dict={self.states: X, self.labels: Y})
+            feed_dict={self.states: X, self.acs:actions, self.labels: labels})
         # print(avg_loss)
         
         # self.model.fit(X, Y, batch_size=batch_size, epochs=1, verbose=0)

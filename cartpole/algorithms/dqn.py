@@ -68,9 +68,7 @@ class Network:
     def get_loss(self, states, actions, labels):
         action_score = self.get_inference(states, batch_size=self.batch_size)
         actions = tf.cast(actions, dtype=tf.float32)
-        inverse_actions = tf.ones((self.batch_size, 2)) - actions
-        preds = action_score * tf.stop_gradient(actions)
-        labels = inverse_actions * labels + tf.stop_gradient(preds)
+        preds = tf.reduce_sum(action_score * tf.stop_gradient(actions), axis=1, keep_dims=True)
         loss = tf.nn.l2_loss(labels - preds)
         tf.add_to_collection('losses', loss / self.batch_size)
         avg_loss = tf.add_n(tf.get_collection('losses'))
