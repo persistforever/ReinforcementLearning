@@ -79,18 +79,18 @@ class QLearning:
     def __init__(self, is_show=False):
         self.env = gym.make('CartPole-v0')
         self.left_prob = 0.5
-        self.epsilon = 1.0
-        self.epsilon_min = 0.1
-        self.epsilon_iters = 1000
+        self.epsilon = 0.9
+        self.epsilon_min = 0.005
+        self.epsilon_iters = 10000
         self.epsilon_reduce = 1.0 * (self.epsilon - self.epsilon_min) / self.epsilon_iters
         self.replay_memory = []
-        self.replay_memory_maxsize = 100
+        self.replay_memory_maxsize = 2000
         self.batch_size = 32
         self.state_size = 4
         self.n_action = 2
         self.gamma = 0.9
         self.n_before = 500
-        self.n_update_target = 1000
+        self.n_update_target = 100
 
     def init_replay_memory(self):
         n_frame = 0
@@ -149,7 +149,7 @@ class QLearning:
             n_action=self.n_action, gamma=self.gamma, name='target_network')
         
         # 构建优化器
-        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=0.01)
+        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=0.001)
         self.temp_labels = self.q_network.cal_labels(self.next_states, self.rewards, self.is_terminals)
         self.avg_loss = self.q_network.get_loss(self.states, self.actions, self.temp_labels)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
@@ -190,7 +190,6 @@ class QLearning:
                     action_score = self.sess.run(
                         fetches=[self.action_score], 
                         feed_dict={self.states: state_np})
-                    # print(action_score[0], numpy.argmax(action_score[0]))
                     action = 0 if numpy.argmax(action_score[0]) == 0 else 1
                 
                 # 更新env
@@ -212,7 +211,7 @@ class QLearning:
                 # 随机从replay_memory中取出1个batch
                 batch_states = numpy.zeros((self.batch_size, self.state_size))
                 batch_next_states = numpy.zeros((self.batch_size, self.state_size))
-                batch_actions = numpy.zeros((self.batch_size, 2))
+                batch_actions = numpy.zeros((self.batch_size, self.n_action))
                 rewards = numpy.zeros((self.batch_size, 1)) 
                 batch_rewards = numpy.zeros((self.batch_size, 1))
                 batch_is_terminals = numpy.zeros((self.batch_size, 1))
