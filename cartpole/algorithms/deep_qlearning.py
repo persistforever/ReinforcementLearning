@@ -42,7 +42,7 @@ class QLearning:
 			done, trajectory = False, []
 			while not done:
 				# render and observe
-				self.env.render()
+				# self.env.render()
 				# choose action
 				sample = [list(state)]
 				actionid = self._sample_action(state)
@@ -62,11 +62,12 @@ class QLearning:
 			# memory replay
 			self._memory_replay(size=self.memory_size)
 			# save trajectory
-			print '@iter: %i, score: %i, epsilon: %.2f' % (n_iter, \
-				int(sum([t[2] for t in trajectory[:-1]])), self.epsilon)
+			print('@iter: %i, score: %i, epsilon: %.2f' % (n_iter, \
+				int(sum([t[2] for t in trajectory[:-1]])), self.epsilon))
 			self.trajectory_list.append(trajectory)
 			
 		end_time = time.time()
+		"""
 		print '%s consumes %i tries' % ('QLearning', self.n_try)
 		self.log.append('%s consumes %i tries' % ('QLearning', self.n_try))
 		print '%s consumes %.2f seconds' % ('QLearning', end_time-start_time)
@@ -74,6 +75,7 @@ class QLearning:
 		# save trajectory
 		self._save_trajectory(self.trajectory_list, [])
 		self._save_log(self.log, self._get_log_path(self.index))
+		"""
 		
 	def _build_model(self):
 		# Neural Net for Deep-Q learning Model
