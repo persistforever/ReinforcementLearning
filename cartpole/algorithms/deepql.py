@@ -66,8 +66,7 @@ class Network:
 
     def get_loss1(self, states, actions, labels):
         action_score = self.get_inference(states, batch_size=self.batch_size)
-        actions = tf.cast(actions, dtype=tf.float32)
-        preds = tf.reduce_sum(action_score * tf.stop_gradient(actions), axis=1, keep_dims=True)
+        preds = tf.reduce_sum(action_score * actions, axis=1, keep_dims=True)
         loss = tf.nn.l2_loss(labels - preds)
         tf.add_to_collection('losses', loss / self.batch_size)
         avg_loss = tf.add_n(tf.get_collection('losses'))
@@ -109,22 +108,31 @@ class QLearning:
             whole_reward = 0
             while not done:
                 # render and observe
-                sample = [list(state)]
-                actionid = self._sample_action(state)
-                sample.append(actionid)
+                if random.random() < self.epsilon:
+                    action = 0 if random.random() < 0.5 else 1
+                else:
+                    action_score = self.sess.run(self.action_score, feed_dict={
+                        self.states: numpy.reshape(state, [1, self.state_size])})
+                    # q_value = self.model.predict(state)[0,:]
+                    action = numpy.argmax(action_score[0])
+
                 # get information from evironment
-                new_state, reward, done, _ = self.env.step(action=actionid)
+                next_state, reward, done, _ = self.env.step(action=action)
                 reward = reward if not done else -10
                 whole_reward += reward
-                sample.append(reward)
+
                 # store memory
-                self.memory.append((numpy.reshape(state, [1, self.state_size]), 
-                    actionid, reward, numpy.reshape(new_state, [1, self.state_size]), done))
-                # update state
-                state = copy.deepcopy(new_state)		
+                self.memory.append({
+                    'state': numpy.reshape(state, [1, self.state_size]), 
+                    'action': action, 
+                    'reward': reward,
+                    'next_state': numpy.reshape(next_state, [1, self.state_size]), 
+                    'is_end': done})
+                state = copy.deepcopy(next_state)
 		
                 # memory replay
                 self._memory_replay(size=self.memory_size)
+
             print('@iter: %i, score: %i, epsilon: %.2f' % (n_iter, \
                 whole_reward, self.epsilon))
             self.trajectory_list.append(trajectory)
@@ -172,13 +180,19 @@ class QLearning:
         
     def _memory_replay(self, size=32):
         batch_size = min(size, len(self.memory))
-        batch_data = random.sample(self.memory, batch_size)
+        # batch_data = random.sample(self.memory, batch_size)
         X = numpy.zeros((batch_size, self.state_size))
         Y = numpy.zeros((batch_size, len(self.actions)))
         actions = numpy.zeros((batch_size, len(self.actions)))
         labels = numpy.zeros((batch_size, 1))
         for i in range(batch_size):
-            state, action, reward, next_state, done = batch_data[i]
+            index = random.randint(0, len(self.memory)-1)
+            state = self.memory[index]['state']
+            action = self.memory[index]['action']
+            reward = self.memory[index]['reward']
+            next_state = self.memory[index]['next_state']
+            done = self.memory[index]['is_end']
+            # state, action, reward, next_state, done = batch_data[i]
             action_score = self.sess.run(self.action_score, feed_dict={
                 self.states: state})
             target = action_score[0]

@@ -67,8 +67,7 @@ class Network:
 
     def get_loss(self, states, actions, labels):
         action_score = self.get_inference(states, batch_size=self.batch_size)
-        actions = tf.cast(actions, dtype=tf.float32)
-        preds = tf.reduce_sum(action_score * tf.stop_gradient(actions), axis=1, keep_dims=True)
+        preds = tf.reduce_sum(action_score * actions, axis=1, keep_dims=True)
         loss = tf.nn.l2_loss(labels - preds)
         tf.add_to_collection('losses', loss / self.batch_size)
         avg_loss = tf.add_n(tf.get_collection('losses'))
@@ -122,7 +121,7 @@ class QLearning:
                 None, self.state_size],
             name='next_states')
         self.actions = tf.placeholder(
-            dtype=tf.int32, shape=[
+            dtype=tf.float32, shape=[
                 self.batch_size, self.n_action],
             name='actions')
         self.rewards = tf.placeholder(
@@ -133,6 +132,10 @@ class QLearning:
             dtype=tf.float32, shape=[
                 self.batch_size, 1],
             name='is_terminals')
+        self.labels = tf.placeholder(
+            dtype=tf.float32, shape=[
+                self.batch_size, 1],
+            name='labels')
         self.global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
         
         # 构建会话和Network对象
@@ -147,8 +150,8 @@ class QLearning:
         
         # 构建优化器
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=0.01)
-        self.temp_labels = self.q_network.cal_labels(self.next_states, self.rewards, self.is_terminals)
-        self.avg_loss = self.q_network.get_loss(self.states, self.actions, self.temp_labels)
+        # self.temp_labels = self.q_network.cal_labels(self.next_states, self.rewards, self.is_terminals)
+        self.avg_loss = self.q_network.get_loss(self.states, self.actions, self.labels)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
         # 构建预测器
         self.action_score = self.q_network.get_inference(self.states, batch_size=1)
@@ -214,7 +217,7 @@ class QLearning:
                     item = self.replay_memory[index]
                     batch_states.append(item['state'])
                     batch_next_states.append(item['next_state'])
-                    batch_actions.append([1, 0] if item['action'] == 1 else [0, 1])
+                    batch_actions.append([1.0, 0.0] if item['action'] == 1 else [0.0, 1.0])
                     batch_rewards.append([item['reward']])
                     batch_is_terminals.append([0.0 if item['is_end'] else 1.0])
                 batch_states = numpy.array(batch_states, dtype='float32')
