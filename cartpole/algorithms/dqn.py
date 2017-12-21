@@ -90,7 +90,7 @@ class QLearning:
         self.n_action = 2
         self.gamma = 0.9
         self.n_before = 500
-        self.n_update_target = 100
+        self.n_update_target = 1000
 
     def init_replay_memory(self):
         n_frame = 0
@@ -150,8 +150,8 @@ class QLearning:
         
         # 构建优化器
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=0.01)
-        # self.temp_labels = self.q_network.cal_labels(self.next_states, self.rewards, self.is_terminals)
-        self.avg_loss = self.q_network.get_loss(self.states, self.actions, self.labels)
+        self.temp_labels = self.q_network.cal_labels(self.next_states, self.rewards, self.is_terminals)
+        self.avg_loss = self.q_network.get_loss(self.states, self.actions, self.temp_labels)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
         # 构建预测器
         self.action_score = self.q_network.get_inference(self.states, batch_size=1)
@@ -170,8 +170,8 @@ class QLearning:
         n_frame = 0
         for n_episode in range(n_episodes):
             # 用q_network更新target_network的参数
-            # if n_frame % self.n_update_target == 0:
-            #     self._update_target(self.q_network, self.target_network)
+            if n_frame % self.n_update_target == 0:
+                self._update_target(self.q_network, self.target_network)
             
             # 初始化trajectory
             state = self.env.reset()
@@ -210,21 +210,20 @@ class QLearning:
                 state = copy.deepcopy(next_state)
                 
                 # 随机从replay_memory中取出1个batch
-                batch_states, batch_next_states, batch_actions, batch_rewards, batch_is_terminals = \
-                    [], [], [], [], []
+                batch_states = numpy.zeros((self.batch_size, self.state_size))
+                batch_next_states = numpy.zeros((self.batch_size, self.state_size))
+                batch_actions = numpy.zeros((self.batch_size, 2))
+                rewards = numpy.zeros((self.batch_size, 1)) 
+                batch_rewards = numpy.zeros((self.batch_size, 1))
+                batch_is_terminals = numpy.zeros((self.batch_size, 1))
                 for j in range(self.batch_size):
                     index = random.randint(0, len(self.replay_memory)-1)
                     item = self.replay_memory[index]
-                    batch_states.append(item['state'])
-                    batch_next_states.append(item['next_state'])
-                    batch_actions.append([1.0, 0.0] if item['action'] == 1 else [0.0, 1.0])
-                    batch_rewards.append([item['reward']])
-                    batch_is_terminals.append([0.0 if item['is_end'] else 1.0])
-                batch_states = numpy.array(batch_states, dtype='float32')
-                batch_next_states = numpy.array(batch_next_states, dtype='float32')
-                batch_actions = numpy.array(batch_actions, dtype='int32')
-                batch_rewards = numpy.array(batch_rewards, dtype='float32')
-                batch_is_terminals = numpy.array(batch_is_terminals, dtype='float32')
+                    batch_states[j,:] = item['state']
+                    batch_next_states[j,:] = item['next_state']
+                    batch_actions[j,:] = [1.0, 0.0] if item['action'] == 0 else [0.0, 1.0]
+                    batch_rewards[j,:] = item['reward']
+                    batch_is_terminals[j,:] = [0.0] if item['is_end'] else [1.0]
                 [_, avg_loss] = self.sess.run(
                     fetches=[self.optimizer_handle, self.avg_loss],
                     feed_dict={

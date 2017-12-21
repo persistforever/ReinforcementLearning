@@ -181,12 +181,10 @@ class QLearning:
         
     def _memory_replay(self, size=32):
         batch_size = min(size, len(self.memory))
-        # batch_data = random.sample(self.memory, batch_size)
         states = numpy.zeros((batch_size, self.state_size))
         next_states = numpy.zeros((batch_size, self.state_size))
         actions = numpy.zeros((batch_size, len(self.actions)))
         rewards = numpy.zeros((batch_size, 1)) 
-        # labels = numpy.zeros((batch_size, 1))
         is_ends = numpy.zeros((batch_size, 1))
         for i in range(batch_size):
             index = random.randint(0, len(self.memory)-1)
