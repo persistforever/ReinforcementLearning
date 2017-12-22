@@ -8,7 +8,6 @@ import time
 import os
 import cv2
 import numpy
-import pygame
 
 
 class Object:
@@ -66,6 +65,8 @@ class Environment:
     
     def __init__(self, is_show=True):
         self.is_show = is_show
+        if self.is_show:
+            import pygame
 
         self.width = 288
         self.height = 512
