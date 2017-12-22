@@ -8,7 +8,7 @@ import time
 import os
 import cv2
 import numpy
-# import pygame
+import pygame
 
 
 class Object:
@@ -131,13 +131,7 @@ class Environment:
 
     def render(self, action):
         # 判断是否flap
-        if self.is_show:
-            for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN and \
-                    (event.key == pygame.K_SPACE or event.key == pygame.K_UP):
-                    self.bird_flap = True
-        else:
-            self.bird_flap = True if action == 'flap' else False
+        self.bird_flap = True if action == 'flap' else False
 
         # 移动pipe
         for up_pipe, down_pipe in self.pipe_queue:

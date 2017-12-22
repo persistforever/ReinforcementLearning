@@ -276,20 +276,25 @@ class QLearning:
         self.init_q_network()
         self.saver.restore(self.sess, model_path)
 
-        init_image = self.env.reset()
-        image_queue = [init_image, init_image, init_image, init_image]
-        is_end = False
-        while not is_end:
-            state = self._extract_feature(image_queue)
-            state_np = numpy.array([state], dtype='float32')
-            max_action, action_prob = self.sess.run(
-                fetches=[self.max_action, self.action_prob], 
-                feed_dict={self.images: state_np})
-            print(max_action, action_prob)
-            action = 'flap' if max_action[0] == 0 else 'noflap'
-            next_image, reward, is_end = self.env.render(action)
-            image_queue.pop(0)
-            image_queue.append(next_image)
+        for i in range(100):
+            init_image = self.env.reset()
+            image_queue = []
+            for i in range(self.image_queue_maxsize):
+                image_queue.append(copy.deepcopy(init_image)) 
+            total_reward = 0.0
+            is_end = False
+            while not is_end:
+                state = self._extract_feature(image_queue)
+                state_np = numpy.array([state], dtype='float32')
+                action_score = self.sess.run(
+                    fetches=[self.action_score], 
+                    feed_dict={self.images: state_np})
+                action = 0 if numpy.argmax(action_score[0]) == 0 else 1
+                next_image, reward, is_end = self.env.render(self.action_options[action])
+                total_reward += reward
+                del image_queue[0]
+                image_queue.append(copy.deepcopy(next_image))
+            print('total reward: %d' % (total_reward))
 
     def _extract_feature(self, images):
         features = []
@@ -329,4 +334,4 @@ if __name__ == '__main__':
         main_dir = 'D://Github/ReinforcementLearning'
         qlearning = QLearning(is_show=True)
         qlearning.test(
-            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_150.ckpt'))
+            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_8000.ckpt'))
