@@ -107,7 +107,7 @@ class QLearning:
         self.n_history = self.image_queue_maxsize
         self.image_y_size = 80
         self.image_x_size = 80
-        self.action_options = ['left', 'right']
+        self.action_options = ['flap', 'noflap']
         self.n_action = 2
         self.gamma = 0.95
         self.n_before = 3000
@@ -173,7 +173,7 @@ class QLearning:
         
         # 构建优化器
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=1e-6, decay=0.9, momentum=0.95)
-        self.temp_labels = self.target_network.cal_labels(self.next_images, self.rewards, self.is_terminals)
+        self.temp_labels = self.q_network.cal_labels(self.next_images, self.rewards, self.is_terminals)
         self.avg_loss = self.q_network.get_loss(self.images, self.actions, self.temp_labels)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
         # 构建预测器
@@ -193,8 +193,8 @@ class QLearning:
         n_frame = 0
         for n_episode in range(n_episodes):
             # 用q_network更新target_network的参数
-            if n_frame % self.n_update_target == 0:
-                self._update_target(self.q_network, self.target_network)
+            # if n_frame % self.n_update_target == 0:
+            #     self._update_target(self.q_network, self.target_network)
             
             # 初始化trajectory
             init_image = self.env.reset()
@@ -319,8 +319,8 @@ if __name__ == '__main__':
     
     if method == 'train':
         gpus = arg.gpus
-        os.environ['CUDA_VISIBLE_DEVICES'] = ''
-        main_dir = 'D://Github/ReinforcementLearning'
+        os.environ['CUDA_VISIBLE_DEVICES'] = gpus
+        main_dir = '/home/caory/github/ReinforcementLearning'
         qlearning = QLearning(is_show=False)
         qlearning.train(n_episodes=50000, 
             backup_dir=os.path.join(main_dir, 'backup', 'flappy'))
