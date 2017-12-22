@@ -52,7 +52,7 @@ class ConvLayer:
         # calculate input_shape and output_shape
         self.output_shape = [self.input_shape[0], int(self.input_shape[1]/self.stride),
                              int(self.input_shape[2]/self.stride), self.n_filter]
-        print('%-10s\t%-20s\t%-20s\t%s' % (
+        print('%-20s\t%-20s\t%-20s\t%s' % (
             self.name, 
             '(%d * %d * %d / %d)' % (
                 self.n_size, self.n_size, self.n_filter, self.stride),

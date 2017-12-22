@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # author: ronniecao
 # time: 2017/12/17
-# description: DQN of flappy bird
+# description: DQN of cartpole
 import sys
 import os
 import random
@@ -132,10 +132,6 @@ class QLearning:
             dtype=tf.float32, shape=[
                 self.batch_size, 1],
             name='is_terminals')
-        self.labels = tf.placeholder(
-            dtype=tf.float32, shape=[
-                self.batch_size, 1],
-            name='labels')
         self.global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
         
         # 构建会话和Network对象

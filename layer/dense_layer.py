@@ -54,7 +54,7 @@ class DenseLayer:
         # 打印网络权重、输入、输出信息
         # calculate input_shape and output_shape
         self.output_shape = [self.input_shape[0], self.hidden_dim]
-        print('%-10s\t%-20s\t%-20s\t%s' % (
+        print('%-20s\t%-20s\t%-20s\t%s' % (
             self.name, 
             '(%d)' % (self.hidden_dim),
             '(%d)' % (self.input_shape[1]),

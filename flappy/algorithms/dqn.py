@@ -77,19 +77,14 @@ class Network:
 
     def cal_labels(self,next_images, rewards, is_terminals):
         next_action_score = self.get_inference(next_images, batch_size=self.batch_size)
-        # max_action_score = tf.Print(next_action_score, [next_action_score], 'next_action_score: ', summarize=1000)
         max_action_score = tf.reduce_max(next_action_score, axis=1, keep_dims=True)
         labels = tf.stop_gradient(rewards + self.gamma * max_action_score * is_terminals)
-        # labels = tf.Print(labels, [labels], 'labels: ', summarize=1000)
-
+        
         return labels
 
     def get_loss(self, images, actions, labels):
         action_score = self.get_inference(images, batch_size=self.batch_size)
-        # action_score = tf.Print(action_score, [action_score], 'action_score: ', summarize=1000)
-        actions = tf.cast(actions, dtype=tf.float32)
-        preds = tf.reduce_sum(action_score * tf.stop_gradient(actions), axis=1, keep_dims=True)
-        #preds = tf.Print(preds, [preds], 'preds: ', summarize=1000)
+        preds = tf.reduce_sum(action_score * actions, axis=1, keep_dims=True)
         loss = tf.nn.l2_loss(labels - preds)
         tf.add_to_collection('losses', loss / self.batch_size)
         avg_loss = tf.add_n(tf.get_collection('losses'))
@@ -112,6 +107,7 @@ class QLearning:
         self.n_history = self.image_queue_maxsize
         self.image_y_size = 80
         self.image_x_size = 80
+        self.action_options = ['left', 'right']
         self.n_action = 2
         self.gamma = 0.95
         self.n_before = 3000
@@ -128,8 +124,8 @@ class QLearning:
             n_frame += 1
             while not is_end:
                 rnd = random.random()
-                action = 'flap' if rnd < self.flap_prob else 'noflap'
-                next_image, reward, is_end = self.env.render(action)
+                action = 0 if rnd < self.flap_prob else 1
+                next_image, reward, is_end = self.env.render(self.action_options[action])
                 state = self._extract_feature(image_queue)
                 del image_queue[0]
                 image_queue.append(copy.deepcopy(next_image))
@@ -150,7 +146,7 @@ class QLearning:
                 None, self.image_y_size, self.image_x_size, self.n_history],
             name='next_images')
         self.actions = tf.placeholder(
-            dtype=tf.int32, shape=[
+            dtype=tf.float32, shape=[
                 self.batch_size, self.n_action],
             name='actions')
         self.rewards = tf.placeholder(
@@ -214,17 +210,16 @@ class QLearning:
                 state = self._extract_feature(image_queue)
                 # 采样action
                 if random.random() < self.epsilon:
-                    action = 'flap' if random.random() < self.flap_prob else 'noflap'
+                    action = 0 if random.random() < self.flap_prob else 1
                 else:
                     state_np = numpy.array([state], dtype='float32')
                     action_score = self.sess.run(
                         fetches=[self.action_score], 
                         feed_dict={self.images: state_np})
-                    # print(action_score[0], numpy.argmax(action_score[0]))
-                    action = 'flap' if numpy.argmax(action_score[0]) == 0 else 'noflap'
+                    action = 0 if numpy.argmax(action_score[0]) == 0 else 1
                 
                 # 更新env
-                next_image, reward, is_end = self.env.render(action)
+                next_image, reward, is_end = self.env.render(self.action_options[action])
                 self.epsilon = max(self.epsilon - self.epsilon_reduce, self.epsilon_min)
                 total_reward += reward
                 n_step += 1
@@ -239,21 +234,26 @@ class QLearning:
                     del self.replay_memory[0]
                 
                 # 随机从replay_memory中取出1个batch
-                batch_images, batch_next_images, batch_actions, batch_rewards, batch_is_terminals = \
-                    [], [], [], [], []
+                batch_images = numpy.zeros((
+                    self.batch_size, self.image_y_size, self.image_x_size, 
+                    self.n_history), dtype='float32')
+                batch_next_images = numpy.zeros((
+                    self.batch_size, self.image_y_size, self.image_x_size, 
+                    self.n_history), dtype='float32')
+                batch_actions = numpy.zeros((
+                    self.batch_size, self.n_action), dtype='float32')
+                batch_rewards = numpy.zeros((
+                    self.batch_size, 1), dtype='float32')
+                batch_is_terminals = numpy.zeros((
+                    self.batch_size, 1), dtype='float32')
                 for j in range(self.batch_size):
                     index = random.randint(0, len(self.replay_memory)-1)
                     item = self.replay_memory[index]
-                    batch_images.append(item['state'])
-                    batch_next_images.append(item['next_state'])
-                    batch_actions.append([1, 0] if item['action'] == 'flap' else [0, 1])
-                    batch_rewards.append([item['reward']])
-                    batch_is_terminals.append([0.0 if item['is_end'] else 1.0])
-                batch_images = numpy.array(batch_images, dtype='float32')
-                batch_next_images = numpy.array(batch_next_images, dtype='float32')
-                batch_actions = numpy.array(batch_actions, dtype='int32')
-                batch_rewards = numpy.array(batch_rewards, dtype='float32')
-                batch_is_terminals = numpy.array(batch_is_terminals, dtype='float32')
+                    batch_images[j,:,:,:] = item['state']
+                    batch_next_images[j,:,:,:] = item['next_state']
+                    batch_actions[j,:] = [1.0, 0.0] if item['action'] == 0 else [0.0, 1.0]
+                    batch_rewards[j,:] = [item['reward']]
+                    batch_is_terminals[j,:] = [0.0] if item['is_end'] else [1.0]
                 [_, avg_loss] = self.sess.run(
                     fetches=[self.optimizer_handle, self.avg_loss],
                     feed_dict={
@@ -319,8 +319,8 @@ if __name__ == '__main__':
     
     if method == 'train':
         gpus = arg.gpus
-        os.environ['CUDA_VISIBLE_DEVICES'] = gpus
-        main_dir = '/home/caory/github/ReinforcementLearning'
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
+        main_dir = 'D://Github/ReinforcementLearning'
         qlearning = QLearning(is_show=False)
         qlearning.train(n_episodes=50000, 
             backup_dir=os.path.join(main_dir, 'backup', 'flappy'))
