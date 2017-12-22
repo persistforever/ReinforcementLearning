@@ -245,32 +245,21 @@ class QLearning:
         self.init_q_network()
         self.saver.restore(self.sess, model_path)
 
-        init_image = self.env.reset()
-        image_queue = [init_image, init_image, init_image, init_image]
-        is_end = False
-        while not is_end:
-            state = self._extract_feature(image_queue)
-            state_np = numpy.array([state], dtype='float32')
-            max_action, action_prob = self.sess.run(
-                fetches=[self.max_action, self.action_prob], 
-                feed_dict={self.images: state_np})
-            print(max_action, action_prob)
-            action = 'flap' if max_action[0] == 0 else 'noflap'
-            next_image, reward, is_end = self.env.render(action)
-            image_queue.pop(0)
-            image_queue.append(next_image)
-
-    def _extract_feature(self, images):
-        features = []
-        for image in images:
-            new_image = cv2.resize(image, (self.image_x_size, self.image_y_size))
-            new_image = cv2.cvtColor(new_image, cv2.COLOR_BGR2GRAY)
-            new_image = numpy.array(new_image/255.0, dtype='float32')
-            new_image = numpy.reshape(new_image, (self.image_y_size, self.image_x_size, 1))
-            features.append(new_image)
-        feature = numpy.concatenate(features, axis=2)
-        
-        return feature
+        for n_episode in range(10):
+            state = self.env.reset()
+            is_end = False
+            total_reward = 0.0
+            while not is_end:
+                self.env.render()
+                state_np = numpy.array([state], dtype='float32')
+                action_score = self.sess.run(
+                    fetches=[self.action_score], 
+                    feed_dict={self.states: state_np})
+                action = 0 if numpy.argmax(action_score[0]) == 0 else 1
+                next_state, reward, is_end, _ = self.env.step(action)
+                total_reward += reward
+                state = copy.deepcopy(next_state)
+            print('[%d] total_reward: %d' % (n_episode, total_reward))
 
     def _update_target(self, q_network, target_network):
         for i in range(len(q_network.layers)):
@@ -298,4 +287,4 @@ if __name__ == '__main__':
         main_dir = 'D://Github/ReinforcementLearning'
         qlearning = QLearning(is_show=True)
         qlearning.test(
-            model_path=os.path.join(main_dir, 'backup', 'cartpole', 'model_150.ckpt'))
+            model_path=os.path.join(main_dir, 'backup', 'cartpole', 'model_500.ckpt'))
