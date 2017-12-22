@@ -173,7 +173,7 @@ class QLearning:
         
         # 构建优化器
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=1e-6, decay=0.9, momentum=0.95)
-        self.temp_labels = self.q_network.cal_labels(self.next_images, self.rewards, self.is_terminals)
+        self.temp_labels = self.target_network.cal_labels(self.next_images, self.rewards, self.is_terminals)
         self.avg_loss = self.q_network.get_loss(self.images, self.actions, self.temp_labels)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
         # 构建预测器
@@ -191,10 +191,11 @@ class QLearning:
 
         print('\nstart training ...\n')
         n_frame = 0
+        max_total_reward = 0
         for n_episode in range(n_episodes):
             # 用q_network更新target_network的参数
-            # if n_frame % self.n_update_target == 0:
-            #     self._update_target(self.q_network, self.target_network)
+            if n_frame % self.n_update_target == 0:
+                self._update_target(self.q_network, self.target_network)
             
             # 初始化trajectory
             init_image = self.env.reset()
@@ -265,12 +266,10 @@ class QLearning:
                 n_episode, avg_loss, total_reward, self.env.n_score))
             
             # trajectory结束后保存模型
-            if (n_episode <= 1000 and n_episode % 100 == 0) or \
-                (1000 < n_episode <= 10000 and n_episode % 500 == 0) or \
-                (10000 < n_episode <= 50000 and n_episode % 2000 == 0):
-                
-                model_path = os.path.join(backup_dir, 'model_%d.ckpt' % (n_episode))
+            if total_reward >= max_total_reward: 
+                model_path = os.path.join(backup_dir, 'model_best.ckpt')
                 self.saver.save(self.sess, model_path)
+                max_total_reward = total_reward
 
     def test(self, model_path):
         self.init_q_network()
@@ -328,7 +327,7 @@ if __name__ == '__main__':
         main_dir = '/home/caory/github/ReinforcementLearning'
         qlearning = QLearning(is_show=False)
         qlearning.train(n_episodes=50000, 
-            backup_dir=os.path.join(main_dir, 'backup', 'flappy'))
+            backup_dir=os.path.join(main_dir, 'backup', 'flappy-v2'))
     elif method == 'test':
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
         main_dir = 'D://Github/ReinforcementLearning'
