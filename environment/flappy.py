@@ -8,65 +8,13 @@ import time
 import os
 import cv2
 import numpy
-
-
-class Object:
-    def __init__(self, pic_path, color, is_reverse=False, is_show=False):
-        self.pos = [0, 0] # initial position
-        image = cv2.imread(pic_path)
-        self.size = [image.shape[1], image.shape[0]] # 物体的宽和高
-        if is_show:
-            self.surface = pygame.image.load(pic_path).convert_alpha()
-            if is_reverse:
-                self.surface = pygame.transform.rotate(self.surface, 180)
-        image_r = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[0]
-        image_g = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[1]
-        image_b = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[2]
-        self.image = numpy.concatenate([image_r, image_g, image_b], axis=2)
-        self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
-
-class Background(Object):
-    def __init__(self, pic_path, is_show=False):
-        Object.__init__(self, pic_path, color=[35,35,35], is_show=is_show)
-        self.pos = [0, 0]
-
-class Pipe(Object):
-    def __init__(self, pic_path, is_reverse=False, is_show=False):
-        Object.__init__(self, pic_path, color=[67,205,128], 
-            is_reverse=is_reverse, is_show=is_show)
-        self.is_reverse = is_reverse # 是否是翻转的管道
-        self.speed = -4 # 横向的平移量
-        self.is_passed = False # 管道是否被穿过
-
-class Ground(Object):
-    def __init__(self, pic_path, is_show=False):
-        Object.__init__(self, pic_path, color=[238,220,130], is_show=is_show)
-        self.pos = [0, 400]
-        self.speed = -100 # 横向的平移速度
-
-class Score(Object):
-    def __init__(self, pic_path, is_show=False):
-        Object.__init__(self, pic_path, color=[220,220,220], is_show=is_show)
-        self.pos = [120, 20]
-
-class Bird(Object):
-
-    def __init__(self, pic_path, is_show=False):
-        Object.__init__(self, pic_path, color=[65,105,225], is_show=is_show)
-        self.pos = [50, 256]
-        self.max_speed = 10 # 纵向的最大下落速度
-        self.accleration = 1 # 纵向的下落加速度
-        self.flap_speed = -9 # 纵向的振翅上升速度
-        self.speed = self.flap_speed # 纵向的速度
-        self.is_flap = False # 是否振翅
+import pygame
 
 
 class Environment:
     
     def __init__(self, is_show=True):
         self.is_show = is_show
-        if self.is_show:
-            import pygame
 
         self.width = 288
         self.height = 512
@@ -276,6 +224,56 @@ class Environment:
             is_union = False
 
         return is_union
+
+class Object:
+    def __init__(self, pic_path, color, is_reverse=False, is_show=False):
+        self.pos = [0, 0] # initial position
+        image = cv2.imread(pic_path)
+        self.size = [image.shape[1], image.shape[0]] # 物体的宽和高
+        if is_show:
+            self.surface = pygame.image.load(pic_path).convert_alpha()
+            if is_reverse:
+                self.surface = pygame.transform.rotate(self.surface, 180)
+        image_r = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[0]
+        image_g = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[1]
+        image_b = numpy.zeros((self.size[1], self.size[0], 1), dtype='uint8') + color[2]
+        self.image = numpy.concatenate([image_r, image_g, image_b], axis=2)
+        self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+
+class Background(Object):
+    def __init__(self, pic_path, is_show=False):
+        Object.__init__(self, pic_path, color=[35,35,35], is_show=is_show)
+        self.pos = [0, 0]
+
+class Pipe(Object):
+    def __init__(self, pic_path, is_reverse=False, is_show=False):
+        Object.__init__(self, pic_path, color=[67,205,128], 
+            is_reverse=is_reverse, is_show=is_show)
+        self.is_reverse = is_reverse # 是否是翻转的管道
+        self.speed = -4 # 横向的平移量
+        self.is_passed = False # 管道是否被穿过
+
+class Ground(Object):
+    def __init__(self, pic_path, is_show=False):
+        Object.__init__(self, pic_path, color=[238,220,130], is_show=is_show)
+        self.pos = [0, 400]
+        self.speed = -100 # 横向的平移速度
+
+class Score(Object):
+    def __init__(self, pic_path, is_show=False):
+        Object.__init__(self, pic_path, color=[220,220,220], is_show=is_show)
+        self.pos = [120, 20]
+
+class Bird(Object):
+
+    def __init__(self, pic_path, is_show=False):
+        Object.__init__(self, pic_path, color=[65,105,225], is_show=is_show)
+        self.pos = [50, 256]
+        self.max_speed = 10 # 纵向的最大下落速度
+        self.accleration = 1 # 纵向的下落加速度
+        self.flap_speed = -9 # 纵向的振翅上升速度
+        self.speed = self.flap_speed # 纵向的速度
+        self.is_flap = False # 是否振翅
 
 
 def main():

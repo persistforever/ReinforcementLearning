@@ -266,10 +266,36 @@ class QLearning:
                 n_episode, avg_loss, total_reward, self.env.n_score))
             
             # trajectory结束后保存模型
-            if total_reward >= max_total_reward: 
+            total_rewards = self.valid()
+            if total_rewards >= max_total_reward:
                 model_path = os.path.join(backup_dir, 'model_best.ckpt')
                 self.saver.save(self.sess, model_path)
-                max_total_reward = total_reward
+                max_total_reward = total_rewards
+
+    def valid(self):
+        total_rewards = 0
+        n_iters = 50
+        for i in range(n_iters):
+            init_image = self.env.reset()
+            image_queue = []
+            for i in range(self.image_queue_maxsize):
+                image_queue.append(copy.deepcopy(init_image))
+            total_reward = 0.0
+            is_end = False
+            while not is_end:
+                state = self._extract_feature(image_queue)
+                state_np = numpy.array([state], dtype='float32')
+                action_score = self.sess.run(
+                    fetches=[self.action_score],
+                    feed_dict={self.images: state_np})
+                action = 0 if numpy.argmax(action_score[0]) == 0 else 1
+                next_image, reward, is_end = self.env.render(self.action_options[action])
+                total_reward += reward
+                del image_queue[0]
+                image_queue.append(copy.deepcopy(next_image))
+            total_rewards += total_reward
+
+        return 1.0 * total_rewards / n_iters
 
     def test(self, model_path):
         self.init_q_network()
@@ -279,7 +305,7 @@ class QLearning:
             init_image = self.env.reset()
             image_queue = []
             for i in range(self.image_queue_maxsize):
-                image_queue.append(copy.deepcopy(init_image)) 
+                image_queue.append(copy.deepcopy(init_image))
             total_reward = 0.0
             is_end = False
             while not is_end:
@@ -333,4 +359,4 @@ if __name__ == '__main__':
         main_dir = 'D://Github/ReinforcementLearning'
         qlearning = QLearning(is_show=True)
         qlearning.test(
-            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_8000.ckpt'))
+            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_6000.ckpt'))
