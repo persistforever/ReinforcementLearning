@@ -266,11 +266,13 @@ class QLearning:
                 n_episode, avg_loss, total_reward, self.env.n_score))
             
             # trajectory结束后保存模型
-            total_rewards = self.valid()
-            if total_rewards >= max_total_reward:
-                model_path = os.path.join(backup_dir, 'model_best.ckpt')
-                self.saver.save(self.sess, model_path)
-                max_total_reward = total_rewards
+            if n_episode % 1000 == 0:
+                total_reward = self.valid()
+                print('[%d] valid n_score: %d' % (n_episode, total_reward))
+                if total_reward >= max_total_reward:
+                    model_path = os.path.join(backup_dir, 'model_best.ckpt')
+                    self.saver.save(self.sess, model_path)
+                    max_total_reward = total_reward
 
     def valid(self):
         total_rewards = 0
@@ -293,7 +295,7 @@ class QLearning:
                 total_reward += reward
                 del image_queue[0]
                 image_queue.append(copy.deepcopy(next_image))
-            total_rewards += total_reward
+            total_rewards += self.env.n_score
 
         return 1.0 * total_rewards / n_iters
 
@@ -306,7 +308,6 @@ class QLearning:
             image_queue = []
             for i in range(self.image_queue_maxsize):
                 image_queue.append(copy.deepcopy(init_image))
-            total_reward = 0.0
             is_end = False
             while not is_end:
                 state = self._extract_feature(image_queue)
@@ -316,9 +317,9 @@ class QLearning:
                     feed_dict={self.images: state_np})
                 action = 0 if numpy.argmax(action_score[0]) == 0 else 1
                 next_image, reward, is_end = self.env.render(self.action_options[action])
-                total_reward += reward
                 del image_queue[0]
                 image_queue.append(copy.deepcopy(next_image))
+            total_reward = self.env.n_score
             print('total reward: %d' % (total_reward))
 
     def _extract_feature(self, images):
@@ -353,7 +354,7 @@ if __name__ == '__main__':
         main_dir = '/home/caory/github/ReinforcementLearning'
         qlearning = QLearning(is_show=False)
         qlearning.train(n_episodes=50000, 
-            backup_dir=os.path.join(main_dir, 'backup', 'flappy-v2'))
+            backup_dir=os.path.join(main_dir, 'backup', 'flappy-v4'))
     elif method == 'test':
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
         main_dir = 'D://Github/ReinforcementLearning'
