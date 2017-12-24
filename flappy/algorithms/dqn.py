@@ -173,7 +173,7 @@ class QLearning:
         
         # 构建优化器
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=1e-6, decay=0.9, momentum=0.95)
-        self.temp_labels = self.target_network.cal_labels(self.next_images, self.rewards, self.is_terminals)
+        self.temp_labels = self.q_network.cal_labels(self.next_images, self.rewards, self.is_terminals)
         self.avg_loss = self.q_network.get_loss(self.images, self.actions, self.temp_labels)
         self.optimizer_handle = self.optimizer.minimize(self.avg_loss, global_step=self.global_step)
         # 构建预测器
