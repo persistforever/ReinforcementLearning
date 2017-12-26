@@ -8,7 +8,7 @@ import time
 import os
 import cv2
 import numpy
-# import pygame
+import pygame
 
 
 class Environment:
