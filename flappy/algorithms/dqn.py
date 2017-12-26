@@ -93,8 +93,8 @@ class Network:
 
 
 class QLearning:
-    def __init__(self, is_show=False):
-        self.env = Environment(is_show=is_show)
+    def __init__(self, is_show=False, is_save=False):
+        self.env = Environment(is_show=is_show, is_save=is_save)
         self.flap_prob = 0.1
         self.epsilon = 1.0
         self.epsilon_min = 0.1
@@ -351,13 +351,11 @@ if __name__ == '__main__':
     if method == 'train':
         gpus = arg.gpus
         os.environ['CUDA_VISIBLE_DEVICES'] = gpus
-        main_dir = '/home/caory/github/ReinforcementLearning'
-        qlearning = QLearning(is_show=False)
+        qlearning = QLearning(is_show=False, is_save=False)
         qlearning.train(n_episodes=50000, 
-            backup_dir=os.path.join(main_dir, 'backup', 'flappy-v4'))
+            backup_dir=os.path.join('backup', 'flappy-v4'))
     elif method == 'test':
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
-        main_dir = 'D://Github/ReinforcementLearning'
-        qlearning = QLearning(is_show=True)
+        qlearning = QLearning(is_show=True, is_save=False)
         qlearning.test(
-            model_path=os.path.join(main_dir, 'backup', 'flappy', 'model_6000.ckpt'))
+            model_path=os.path.join('backup', 'flappy', 'model_best.ckpt'))

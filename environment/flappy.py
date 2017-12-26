@@ -13,8 +13,9 @@ import pygame
 
 class Environment:
     
-    def __init__(self, is_show=True):
+    def __init__(self, is_show=True, is_save=False):
         self.is_show = is_show
+        self.is_save = is_save
 
         self.width = 288
         self.height = 512
@@ -164,6 +165,9 @@ class Environment:
             s.pos[0] = self.score_start_x + i * self.score_width
             self.window.blit(s.surface, s.pos)
 
+        if self.is_save:
+            pygame.image.save(
+                self.window, os.path.join('logs', 'result', '%d.png' % (self.n_frame)))
         pygame.display.flip()
         self.fps_clock.tick(self.max_nps)
 
