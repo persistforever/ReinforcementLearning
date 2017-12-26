@@ -2,7 +2,7 @@
 
 ### demo
 
-![flappy](../logs/flappy.gif)
+![flappy](flappy.gif)
 
 
 
