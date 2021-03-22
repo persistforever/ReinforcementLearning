@@ -1,0 +1,629 @@
+desp: "训练all数据，结合pattern和format特征"
+option:
+    # pre-processing
+    classes: "titles"
+    main_dir: "/data/caory/datasets/detect_heading/20210220/"
+    dpp_dir: "/data/caory/dpp_data/label_contents_answer_v3/"
+    bert_path: "/data/caory/PDFInsight/detect_heading/configs/bert_multilingual_model/"
+    word_vector_path: "/data/caory/PDFInsight/detect_heading/configs/zi_dict_vector_zh.txt"
+    family_vector_path: "/data/caory/PDFInsight/detect_heading/configs/family_dict_vector_zh.txt"
+    is_remove_leaf: True
+    is_add_elements: False
+    is_dataset_load: False
+    char_type: "chinese_chars"
+
+    # data preparation
+    n_channel: &n_channel 24
+    max_utterance_length: &max_utterance_length 3000
+    max_levels_length: &max_levels_length 20
+    max_siblings_length: &max_siblings_length 100
+    max_next_length: &max_next_length 50
+    max_text_length: &max_text_length 32
+    max_format_length: &max_format_length 32
+    max_level: 12
+    n_patterns: &n_patterns 50
+    n_pattern_no: 128
+    n_paragraph_extend: 3000
+
+    # model
+    conv_x_size: 7
+    conv_y_size: 7
+    pool_mode: "max"
+    is_weight_decay: False
+    weight_decay_scale: 0.0001
+    is_train_word_vector: True
+    is_lr_decay: False
+    is_lr_init: False
+    data_format: "channels_last"
+    is_time_major: False
+    update_function: "adam"
+    is_use_first_state: True
+    format_mode: "minus"
+    is_add_rules: True
+    direction: "upwards"
+    is_share_parameters: False
+    is_use_parent: True
+    is_use_sibling: True
+    contextual_method: "cnn"
+    relation_method: "concat"
+    is_add_attention: False
+    is_predict_level: True
+    is_add_outline: False
+    n_step: "two_steps"
+
+    # data
+    logs_dir: "/data/caory/PDFInsight/detect_heading/logs/"
+    seq: "heading-v5"
+
+    # train
+    n_producer: 1
+    n_consumer: 1
+    batch_size: 32
+    memory_buffer_size: 256
+    n_gpus: 1
+    train_gpus: "1"
+    seed: 12
+
+    # detection
+    detection:
+        # model
+        format_dim: &format_dim_detection 11
+        semantic_dim: &semantic_dim 7
+        feature_dim: &feature_dim_detection 2
+        pattern_dim: &pattern_dim_detection 54
+        n_classes: &n_classes_detection 2
+        features: "text,family,format,semantic,pattern"
+        format_features: ""
+        learning_rate: 0.00001
+
+        # data
+        train_name: "/data/caory/datasets/detect_heading/20210220/path_files/chinese_contents/train_all.txt"
+        valid_name: "/data/caory/datasets/detect_heading/20210220/path_files/chinese_contents/valid.txt"
+        model_name: "model_detection_chinese_treelstm"
+        model_epoch: "35"
+
+        # train
+        n_producer: 5
+        n_consumer: 1
+        batch_size: &batch_size 2
+        buffer_size: 5
+        n_gpus: 3
+        train_gpus: "0,1,2"
+        valid_gpus: "3"
+        epoch_start: 35
+        epoch_end: 35
+        save_epoch_freq: 5
+
+        # data_size
+        data_size:
+            index:
+                dtype: "int32"
+                size:
+                    - 1
+
+            element_idx:
+                dtype: "int32"
+                size:
+                    - *max_utterance_length
+
+            text_tensor:
+                dtype: "int32"
+                size:
+                    - *max_utterance_length
+                    - *max_text_length
+                    - 1
+
+            text_length:
+                dtype: "int32"
+                size:
+                    - *max_utterance_length
+                    - 1
+
+            family_tensor:
+                dtype: "int32"
+                size:
+                    - *max_utterance_length
+                    - *max_text_length
+                    - 1
+
+            family_length:
+                dtype: "int32"
+                size:
+                    - *max_utterance_length
+                    - 1
+
+            format_tensor:
+                dtype: "float32"
+                size:
+                    - *max_utterance_length
+                    - *format_dim_detection
+
+            semantic_tensor:
+                dtype: "float32"
+                size:
+                    - *max_utterance_length
+                    - *semantic_dim
+
+            pattern_tensor:
+                dtype: "float32"
+                size:
+                    - *max_utterance_length
+                    - *pattern_dim_detection
+
+            length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            mask:
+                dtype: "float32"
+                size:
+                    - *max_utterance_length
+                    - 1
+
+            label:
+                dtype: "float32"
+                size:
+                    - *max_utterance_length
+                    - *n_classes_detection
+
+            coef:
+                dtype: "float32"
+                size:
+                    - 1
+
+    # classification
+    classification:
+        # model
+        format_dim: &format_dim_classification 6
+        pattern_dim: &pattern_dim_classification 2
+        n_classes: &n_classes_classification 2
+        features: "text,family,format,pattern"
+        learning_rate: 0.0001
+        adam_epsilon: 0.00000001
+        beam_size: 3
+        tree_size: 3
+        is_train_from_prediction: True
+        is_predict_detection: True
+        is_generate_labeled_based_tree: False
+        is_sampling: False
+        is_use_strict_rule: False
+        is_every_level_product: False
+        is_data_aug: False
+        data_aug_ratio: 0.01
+        exploration_epsilon: 0.1
+
+        # data
+        # train_name: "/data/caory/datasets/detect_heading/20210220/path_files/chinese_contents/train.txt"
+        train_name: "/data/caory/datasets/detect_heading/20210220/path_files/chinese_generation_contents/train_part.txt"
+        # train_name: "/data/caory/datasets/detect_heading/20210220/path_files/chinese_sampled_10000_contents/train_part.txt"
+        valid_name: "/data/caory/datasets/detect_heading/20210220/path_files/chinese_generation_contents/valid.txt"
+        train_sampling_dir: "/data/caory/PDFInsight/detect_heading/logs/heading-v5/sampling/"
+        model_name: "model_classification_chinese_dqn"
+        model_epoch: "50000"
+
+        # train
+        n_producer: 1
+        n_consumer: 1
+        batch_size: &batch_size_classification 32
+        example_size: 16
+        buffer_size: 32
+        memory_buffer_size: 256
+        n_gpus: 1
+        train_gpus: "0"
+        update_gpus: "0"
+        sample_gpus: "1"
+        valid_gpus: "3"
+        generate_gpus: "0,1,2,3"
+        sampling_gpus: "0,1,2,3"
+        epoch_start: 0
+        epoch_end: 50
+        save_epoch_freq: 1
+        n_valid: 100
+        generation_name: "generation_chinese_pred_bs_treelstm_testaug"
+
+        # data_size
+        data_size:
+            index:
+                dtype: "int32"
+                size:
+                    - 1
+
+            example_idx:
+                dtype: "int32"
+                size:
+                    - 1
+
+            online_tree_texts:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *max_text_length
+                    - 1
+
+            online_tree_familys:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *max_text_length
+                    - 1
+
+            online_tree_formats:
+                dtype: "float32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *format_dim_classification
+
+            online_tree_patterns:
+                dtype: "float32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *pattern_dim_classification
+
+            online_tree_text_length:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - 1
+
+            online_tree_family_length:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - 1
+
+            online_siblings_length:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - 1
+
+            online_levels_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            online_query_texts:
+                dtype: "int32"
+                size:
+                    - *max_text_length
+                    - 1
+
+            online_query_familys:
+                dtype: "int32"
+                size:
+                    - *max_text_length
+                    - 1
+
+            online_query_formats:
+                dtype: "float32"
+                size:
+                    - *format_dim_classification
+
+            online_query_patterns:
+                dtype: "float32"
+                size:
+                    - *pattern_dim_classification
+
+            online_query_text_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            online_query_family_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            online_query_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            online_next_texts:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - *max_text_length
+                    - 1
+
+            online_next_familys:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - *max_text_length
+                    - 1
+
+            online_next_formats:
+                dtype: "float32"
+                size:
+                    - *max_next_length
+                    - *format_dim_classification
+
+            online_next_patterns:
+                dtype: "float32"
+                size:
+                    - *max_next_length
+                    - *pattern_dim_classification
+
+            online_next_text_length:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - 1
+
+            online_next_family_length:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - 1
+
+            online_next_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            target_tree_texts:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *max_text_length
+                    - 1
+
+            target_tree_familys:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *max_text_length
+                    - 1
+
+            target_tree_formats:
+                dtype: "float32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *format_dim_classification
+
+            target_tree_patterns:
+                dtype: "float32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - *pattern_dim_classification
+
+            target_tree_text_length:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - 1
+
+            target_tree_family_length:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - *max_siblings_length
+                    - 1
+
+            target_siblings_length:
+                dtype: "int32"
+                size:
+                    - *max_levels_length
+                    - 1
+
+            target_levels_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            target_query_texts:
+                dtype: "int32"
+                size:
+                    - *max_text_length
+                    - 1
+
+            target_query_familys:
+                dtype: "int32"
+                size:
+                    - *max_text_length
+                    - 1
+
+            target_query_formats:
+                dtype: "float32"
+                size:
+                    - *format_dim_classification
+
+            target_query_patterns:
+                dtype: "float32"
+                size:
+                    - *pattern_dim_classification
+
+            target_query_text_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            target_query_family_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            target_query_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            target_next_texts:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - *max_text_length
+                    - 1
+
+            target_next_familys:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - *max_text_length
+                    - 1
+
+            target_next_formats:
+                dtype: "float32"
+                size:
+                    - *max_next_length
+                    - *format_dim_classification
+
+            target_next_patterns:
+                dtype: "float32"
+                size:
+                    - *max_next_length
+                    - *pattern_dim_classification
+
+            target_next_text_length:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - 1
+
+            target_next_family_length:
+                dtype: "int32"
+                size:
+                    - *max_next_length
+                    - 1
+
+            target_next_length:
+                dtype: "int32"
+                size:
+                    - 1
+
+            reward:
+                dtype: "float32"
+                size:
+                    - *max_levels_length
+                    - 1
+
+            action_mask:
+                dtype: "float32"
+                size:
+                    - *max_levels_length
+                    - 1
+
+            coef:
+                dtype: "float32"
+                size:
+                    - 1
+
+# framework
+shr_dt_net:
+    text_input_shape:
+        - *max_text_length
+        - *n_channel
+    text_embedding_dim: 128
+
+    family_input_shape:
+        - *max_text_length
+        - *n_channel
+    family_embedding_dim: 64
+
+    feature:
+        # row
+        - {name: "rnn_text", type: "rnn", hidden_dim: 64, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "text_input_shape"}
+        - {name: "rnn_family", type: "rnn", hidden_dim: 32, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "family_input_shape"}
+
+shr_cls_net:
+    text_input_shape:
+        - *max_text_length
+        - *n_channel
+    text_embedding_dim: 64
+
+    family_input_shape:
+        - *max_text_length
+        - *n_channel
+    family_embedding_dim: 32
+
+    feature:
+        # online
+        - {name: "online_rnn_text", type: "rnn", hidden_dim: 32, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "text_input_shape"}
+        - {name: "online_rnn_family", type: "rnn", hidden_dim: 16, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "family_input_shape"}
+        # target
+        - {name: "target_rnn_text", type: "rnn", hidden_dim: 32, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "text_input_shape"}
+        - {name: "target_rnn_family", type: "rnn", hidden_dim: 16, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "family_input_shape"}
+
+dt_net:
+    self_embedding_dim: &self_embedding_dim 264
+    self_embedding_shape:
+        - *max_utterance_length
+        - 1
+        - *self_embedding_dim
+
+    contextual_embedding_dim: &contextual_embedding_dim 512
+    contextual_embedding_shape:
+        - *max_utterance_length
+        - *contextual_embedding_dim
+
+    union_embedding_dim: &union_embedding_dim 776
+    union_embedding_shape:
+        - *union_embedding_dim
+
+    conv_layers: "conv1_1,conv2_1,conv2_2,conv2_3,conv3_1,conv3_2,conv3_3,conv4_1,conv4_2,conv4_3"
+
+    feature:
+        # conv
+        - {name: "conv1_1", type: "conv", x_size: 1, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 256, activation: "leaky_relu", bn: False, prev: "none", input_shape: "self_embedding_shape"}
+        - {name: "conv2_1", type: "conv", x_size: 1, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 256, activation: "leaky_relu", bn: False, prev: "conv1_1"}
+        - {name: "conv2_2", type: "conv", x_size: 1, y_size: 1, x_stride: 1, y_stride: 1, n_filter: 128, activation: "leaky_relu", bn: False, prev: "conv2_1"}
+        - {name: "conv2_3", type: "conv", x_size: 1, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 256, activation: "leaky_relu", bn: False, prev: "conv2_2"}
+        - {name: "conv3_1", type: "conv", x_size: 1, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 512, activation: "leaky_relu", bn: False, prev: "conv2_3"}
+        - {name: "conv3_2", type: "conv", x_size: 1, y_size: 1, x_stride: 1, y_stride: 1, n_filter: 256, activation: "leaky_relu", bn: False, prev: "conv3_1"}
+        - {name: "conv3_3", type: "conv", x_size: 1, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 512, activation: "leaky_relu", bn: False, prev: "conv3_2"}
+        - {name: "conv4_1", type: "conv", x_size: 1, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 512, activation: "leaky_relu", bn: False, prev: "conv3_3"}
+        - {name: "conv4_2", type: "conv", x_size: 1, y_size: 1, x_stride: 1, y_stride: 1, n_filter: 256, activation: "leaky_relu", bn: False, prev: "conv4_1"}
+        - {name: "conv4_3", type: "conv", x_size: 1, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 512, activation: "leaky_relu", bn: False, prev: "conv4_2"}
+        # dense
+        - {name: "dense1", type: "dense", hidden_dim: 2, activation: "none", prev: "none", input_shape: "union_embedding_shape"}
+
+cls_net:
+    siblings_input_dim: &siblings_input_dim 104
+    siblings_shape:
+        - *max_siblings_length
+        - *siblings_input_dim
+
+    query_shape:
+        - 1
+        - *siblings_input_dim
+
+    next_shape:
+        - *max_next_length
+        - *siblings_input_dim
+
+    levels_input_dim: &levels_input_dim 128
+    levels_shape:
+        - *max_levels_length
+
+    levels_output_dim: &levels_output_dim 256
+
+    union_output_dim: &union_output_dim 512
+    union_output_shape:
+        - *union_output_dim
+
+    feature:
+        # online
+        - {name: "online_rnn_siblings", type: "rnn", hidden_dim: 64, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "siblings_shape"}
+        - {name: "online_rnn_levels", type: "rnn", hidden_dim: 128, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "levels_shape"}
+        - {name: "online_rnn_query", type: "rnn", hidden_dim: 64, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "query_shape"}
+        - {name: "online_rnn_next", type: "rnn", hidden_dim: 64, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "next_shape"}
+        - {name: "online_dense", type: "dense", hidden_dim: 1, activation: "none", prev: "none", input_shape: "union_output_shape"}
+        # target
+        - {name: "target_rnn_siblings", type: "rnn", hidden_dim: 64, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "siblings_shape"}
+        - {name: "target_rnn_levels", type: "rnn", hidden_dim: 128, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "levels_shape"}
+        - {name: "target_rnn_query", type: "rnn", hidden_dim: 64, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "query_shape"}
+        - {name: "target_rnn_next", type: "rnn", hidden_dim: 64, n_layers: 1, activation: "tanh", ctype: "lstm", is_bidirection: True, is_combine: False, prev: "none", input_shape: "next_shape"}
+        - {name: "target_dense", type: "dense", hidden_dim: 1, activation: "none", prev: "none", input_shape: "union_output_shape"}
