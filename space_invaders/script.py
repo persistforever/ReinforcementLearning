@@ -33,27 +33,25 @@ class Starter:
         print('Create Processor instance process')
 
         # 实例化网络模块
-        """
         self.network = Network(
             option=self.option,
             name='network')
         print('Create Network instance network')
-        """
 
         # 实例化模型模块
         self.model = Model(
             option=self.option,
             logs_dir=os.path.join(
                 self.option['option']['logs_dir'], self.option['option']['seq']),
-            processor=self.processor)
+            processor=self.processor,
+            network=self.network)
         print('Create Model instance model')
 
     def main(self, method='train', gpus=''):
 
         if method == 'train':
             # 训练模型
-            os.environ['CUDA_VISIBLE_DEVICES'] = \
-                self.option['option']['train_gpus']
+            os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
             self.model.train()
 
 
@@ -70,7 +68,7 @@ if __name__ == '__main__':
     # for debug
     if True:
         whole_method = 'train'
-        whole_config_path = '/home/caory/github/ReinforcementLearning/scripts/space_invaders_v1/config_chinese_dqn.yaml'
+        whole_config_path = '/home/caory/github/ReinforcementLearning/scripts/space_invaders_v1/config_dqn.yaml'
 
     starter = Starter(method=whole_method, config_path=whole_config_path)
     starter.main(method=whole_method)

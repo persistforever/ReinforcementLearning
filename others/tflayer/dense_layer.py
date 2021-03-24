@@ -24,6 +24,7 @@ class DenseLayer:
         self.name = name
         self.scope = scope
         self.lytpe = 'dense'
+
         if prev_layer:
             self.prev_layer = prev_layer
             self.input_shape = prev_layer.output_shape

@@ -26,6 +26,7 @@ class ConvLayer:
         self.data_format = data_format
         self.batch_normal = batch_normal
         self.name = name
+        self.scope = scope
         self.ltype = 'conv'
         self.params = []
 
@@ -58,7 +59,7 @@ class ConvLayer:
 
         self.leaky_scale = tf.constant(0.1, dtype=tf.float32)
 
-        with tf.name_scope(scope):
+        with tf.name_scope(self.scope):
             # 权重矩阵
             numpy.random.seed(0)
             weight_initializer = tf.variance_scaling_initializer(
@@ -100,57 +101,58 @@ class ConvLayer:
             self.output_shape[2] * self.input_shape[2] * self.y_size * self.x_size
 
     def get_output(self, input, is_training=tf.constant(True)):
-        # hidden states
-        if self.data_format == 'channels_first':
-            input = tf.transpose(input, [0,3,1,2])
+        with tf.name_scope(self.scope):
+            # hidden states
+            if self.data_format == 'channels_first':
+                input = tf.transpose(input, [0,3,1,2])
 
-        self.hidden = self.conv(inputs=input)
+            self.hidden = self.conv(inputs=input)
 
-        # batch normalization 技术
-        if self.batch_normal:
-            beta_initializer = tf.zeros_initializer(dtype=tf.float32)
-            gamma_initializer = tf.ones_initializer(dtype=tf.float32)
-            moving_mean_initializer = tf.zeros_initializer(dtype=tf.float32)
-            moving_variance_initializer = tf.ones_initializer(dtype=tf.float32)
+            # batch normalization 技术
+            if self.batch_normal:
+                beta_initializer = tf.zeros_initializer(dtype=tf.float32)
+                gamma_initializer = tf.ones_initializer(dtype=tf.float32)
+                moving_mean_initializer = tf.zeros_initializer(dtype=tf.float32)
+                moving_variance_initializer = tf.ones_initializer(dtype=tf.float32)
 
-            self.hidden = tf.layers.batch_normalization(
-                inputs=self.hidden,
-                axis=-1 if self.data_format == 'channels_last' else 1,
-                momentum=0.9,
-                epsilon=1e-5,
-                center=True,
-                scale=True,
-                beta_initializer=beta_initializer,
-                gamma_initializer=gamma_initializer,
-                moving_mean_initializer=moving_mean_initializer,
-                moving_variance_initializer=moving_variance_initializer,
-                fused=False,
-                training=is_training,
-                trainable=True,
-                reuse=tf.AUTO_REUSE,
-                name='%s_bn' % (self.name))
+                self.hidden = tf.layers.batch_normalization(
+                    inputs=self.hidden,
+                    axis=-1 if self.data_format == 'channels_last' else 1,
+                    momentum=0.9,
+                    epsilon=1e-5,
+                    center=True,
+                    scale=True,
+                    beta_initializer=beta_initializer,
+                    gamma_initializer=gamma_initializer,
+                    moving_mean_initializer=moving_mean_initializer,
+                    moving_variance_initializer=moving_variance_initializer,
+                    fused=False,
+                    training=is_training,
+                    trainable=True,
+                    reuse=tf.AUTO_REUSE,
+                    name='%s_bn' % (self.name))
 
-        # activation
-        if self.activation == 'relu':
-            self.output = tf.nn.relu(self.hidden)
-        elif self.activation == 'tanh':
-            self.output = tf.nn.tanh(self.hidden)
-        elif self.activation == 'leaky_relu':
-            self.output = self.leaky_relu(self.hidden)
-        elif self.activation == 'sigmoid':
-            self.output = tf.nn.sigmoid(self.hidden)
-        elif self.activation == 'none':
-            self.output = self.hidden
+            # activation
+            if self.activation == 'relu':
+                self.output = tf.nn.relu(self.hidden)
+            elif self.activation == 'tanh':
+                self.output = tf.nn.tanh(self.hidden)
+            elif self.activation == 'leaky_relu':
+                self.output = self.leaky_relu(self.hidden)
+            elif self.activation == 'sigmoid':
+                self.output = tf.nn.sigmoid(self.hidden)
+            elif self.activation == 'none':
+                self.output = self.hidden
 
-        # gradient constraint
-        g = tf.get_default_graph()
-        with g.gradient_override_map({"Identity": "CustomClipGrads"}):
-            self.output = tf.identity(self.output, name="Identity")
+            # gradient constraint
+            g = tf.get_default_graph()
+            with g.gradient_override_map({"Identity": "CustomClipGrads"}):
+                self.output = tf.identity(self.output, name="Identity")
 
-        if self.data_format == 'channels_first':
-            self.output = tf.transpose(self.output, [0,2,3,1])
+            if self.data_format == 'channels_first':
+                self.output = tf.transpose(self.output, [0,2,3,1])
 
-        return self.output
+            return self.output
 
     def leaky_relu(self, data):
         output = tf.maximum(self.leaky_scale * data, data, name='leaky_relu')

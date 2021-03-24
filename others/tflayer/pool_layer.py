@@ -23,6 +23,7 @@ class PoolLayer:
         self.data_format = data_format
         self.resp_normal = resp_normal
         self.name = name
+        self.scope = scope
         self.ltype = 'pool'
         self.params = []
         if prev_layer:
@@ -52,7 +53,7 @@ class PoolLayer:
                     self.feel_field[1] * int(prev_layer.x_size))
             prev_layer = prev_layer.prev_layer
 
-        with tf.name_scope(scope):
+        with tf.name_scope(self.scope):
             if self.mode == 'max':
                 self.pool = tf.layers.MaxPooling2D(
                     pool_size=[self.y_size, self.x_size],
@@ -90,17 +91,18 @@ class PoolLayer:
             self.output_shape[2] * self.y_size * self.x_size
 
     def get_output(self, input, is_training=True):
-        if self.data_format == 'channels_first':
-            input = tf.transpose(input, [0,3,1,2])
+        with tf.name_scope(self.scope):
+            if self.data_format == 'channels_first':
+                input = tf.transpose(input, [0,3,1,2])
 
-        self.hidden = self.pool(inputs=input)
+            self.hidden = self.pool(inputs=input)
 
-        if self.resp_normal:
-            self.hidden = tf.nn.local_response_normalization(
-                self.hidden, depth_radius=7, alpha=0.001, beta=0.75, name='lrn')
-        self.output = self.hidden
+            if self.resp_normal:
+                self.hidden = tf.nn.local_response_normalization(
+                    self.hidden, depth_radius=7, alpha=0.001, beta=0.75, name='lrn')
+            self.output = self.hidden
 
-        if self.data_format == 'channels_first':
-            self.output = tf.transpose(self.output, [0,2,3,1])
+            if self.data_format == 'channels_first':
+                self.output = tf.transpose(self.output, [0,2,3,1])
 
-        return self.output
+            return self.output
