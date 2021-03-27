@@ -1,42 +1,45 @@
 desp: "使用dqn玩atari中space-invaders"
 option:
+    # env
+    env_path: "/home/caory/github/ReinforcementLearning/space_invaders/breakout.bin"
+
     # model
-    n_action: &n_action 6
-    n_recent_frame: &n_recent_frame 4
-    origin_y_size: 210
-    origin_x_size: 160
-    resized_y_size: 110
-    resized_x_size: 84
+    n_action: &n_action 4
+    n_history: &n_history 4
     image_y_size: &image_y_size 84
     image_x_size: &image_x_size 84
     image_channel: &image_channel 4
-    pool_mode: "max"
     is_weight_decay: False
     weight_decay_scale: 0.0001
-    data_format: "channels_last"
-    is_time_major: False
-    update_function: "adam"
+    data_format: "channels_first"
+    is_time_major: True
+    update_function: "rmsprop"
 
     # data
     logs_dir: "/home/caory/data/PDFInsight/deep_rl/logs/"
     seq: "space_invaders_v1"
     model_name: "dqn"
+    log_path: "/home/caory/data/PDFInsight/deep_rl/logs/space_invaders_v1/train_logs/dqn.log"
 
     # train
     n_producer: 1
     n_consumer: 1
-    batch_size: 32
-    memory_buffer_size: 10000
+    batch_size: 64
+    init_memory_size: 50000
+    max_memory_size: 1000000
     n_gpus: 1
     gpus: "0"
     train_gpus: "0"
-    learning_rate: 0.0001
+    learning_rate: 0.001
+    gamma: 0.99
     epsilon_start: 1.0
     epsilon_end: 0.1
-    epsilon_decay: 1000000
+    epsilon_decay: 250000
     epoch_start: 1
     max_frame: 10000000
-    save_frame_freq: 100000
+    save_epoch_freq: 10
+    log_frame_freq: 5000
+    update_frame_freq: 5000
     seed: 12
 
     # data_size
@@ -55,22 +58,20 @@ option:
                 - *image_x_size
                 - *image_channel
 
-        reward:
-            dtype: "float32"
-            size:
-                - *n_action
-                - 1
-
         action_mask:
             dtype: "float32"
             size:
                 - *n_action
                 - 1
 
+        reward:
+            dtype: "float32"
+            size:
+                - 1
+
         is_end:
             dtype: "float32"
             size:
-                - *n_action
                 - 1
 
         coef:
@@ -85,27 +86,21 @@ network:
         - *image_x_size
         - *image_channel
 
-    feature_output_size: &feature_output_size 784
+    feature_output_size: &feature_output_size 7744
     classify_input_shape:
         - *feature_output_size
 
     layers:
         online:
-            - {name: "online_conv1_1", type: "conv", x_size: 7, y_size: 7, x_stride: 1, y_stride: 1, n_filter: 4, activation: "leaky_relu", bn: False, prev: "none", input_shape: "feature_input_shape"}
-            - {name: "online_conv1_2", type: "conv", x_size: 7, y_size: 7, x_stride: 3, y_stride: 3, n_filter: 4, activation: "leaky_relu", bn: False, prev: "online_conv1_1"}
-            - {name: "online_conv2_1", type: "conv", x_size: 5, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 8, activation: "leaky_relu", bn: False, prev: "online_conv1_2"}
-            - {name: "online_conv2_2", type: "conv", x_size: 5, y_size: 5, x_stride: 2, y_stride: 2, n_filter: 8, activation: "leaky_relu", bn: False, prev: "online_conv2_1"}
-            - {name: "online_conv3_1", type: "conv", x_size: 3, y_size: 3, x_stride: 1, y_stride: 1, n_filter: 16, activation: "leaky_relu", bn: False, prev: "online_conv2_2"}
-            - {name: "online_conv3_2", type: "conv", x_size: 3, y_size: 3, x_stride: 2, y_stride: 2, n_filter: 16, activation: "leaky_relu", bn: False, prev: "online_conv3_1"}
-            - {name: "online_dense1", type: "dense", hidden_dim: 256, activation: "leaky_relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
-            - {name: "online_dense2", type: "dense", hidden_dim: 6, activation: "none", bn: False, prev: "online_dense1"}
+            - {name: "online_conv1", type: "conv", x_size: 8, y_size: 8, x_stride: 4, y_stride: 4, n_filter: 32, activation: "leaky_relu", bn: False, prev: "none", input_shape: "feature_input_shape"}
+            - {name: "online_conv2", type: "conv", x_size: 4, y_size: 4, x_stride: 2, y_stride: 2, n_filter: 64, activation: "leaky_relu", bn: False, prev: "online_conv1"}
+            - {name: "online_conv3", type: "conv", x_size: 3, y_size: 3, x_stride: 1, y_stride: 1, n_filter: 64, activation: "leaky_relu", bn: False, prev: "online_conv2"}
+            - {name: "online_dense1", type: "dense", hidden_dim: 512, activation: "leaky_relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
+            - {name: "online_dense2", type: "dense", hidden_dim: 4, activation: "none", bn: False, prev: "online_dense1"}
 
         target:
-            - {name: "target_conv1_1", type: "conv", x_size: 7, y_size: 7, x_stride: 1, y_stride: 1, n_filter: 4, activation: "leaky_relu", bn: False, prev: "none", input_shape: "feature_input_shape"}
-            - {name: "target_conv1_2", type: "conv", x_size: 7, y_size: 7, x_stride: 3, y_stride: 3, n_filter: 4, activation: "leaky_relu", bn: False, prev: "target_conv1_1"}
-            - {name: "target_conv2_1", type: "conv", x_size: 5, y_size: 5, x_stride: 1, y_stride: 1, n_filter: 8, activation: "leaky_relu", bn: False, prev: "target_conv1_2"}
-            - {name: "target_conv2_2", type: "conv", x_size: 5, y_size: 5, x_stride: 2, y_stride: 2, n_filter: 8, activation: "leaky_relu", bn: False, prev: "target_conv2_1"}
-            - {name: "target_conv3_1", type: "conv", x_size: 3, y_size: 3, x_stride: 1, y_stride: 1, n_filter: 16, activation: "leaky_relu", bn: False, prev: "target_conv2_2"}
-            - {name: "target_conv3_2", type: "conv", x_size: 3, y_size: 3, x_stride: 2, y_stride: 2, n_filter: 16, activation: "leaky_relu", bn: False, prev: "target_conv3_1"}
-            - {name: "target_dense1", type: "dense", hidden_dim: 256, activation: "leaky_relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
-            - {name: "target_dense2", type: "dense", hidden_dim: 6, activation: "none", bn: False, prev: "target_dense1"}
+            - {name: "target_conv1", type: "conv", x_size: 8, y_size: 8, x_stride: 4, y_stride: 4, n_filter: 32, activation: "leaky_relu", bn: False, prev: "none", input_shape: "feature_input_shape"}
+            - {name: "target_conv2", type: "conv", x_size: 4, y_size: 4, x_stride: 2, y_stride: 2, n_filter: 64, activation: "leaky_relu", bn: False, prev: "target_conv1"}
+            - {name: "target_conv3", type: "conv", x_size: 3, y_size: 3, x_stride: 1, y_stride: 1, n_filter: 64, activation: "leaky_relu", bn: False, prev: "target_conv2"}
+            - {name: "target_dense1", type: "dense", hidden_dim: 512, activation: "leaky_relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
+            - {name: "target_dense2", type: "dense", hidden_dim: 4, activation: "none", bn: False, prev: "target_dense1"}

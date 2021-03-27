@@ -22,6 +22,7 @@ class Network:
         self.n_action = self.option['option']['n_action']
         self.image_y_size = self.option['option']['image_y_size']
         self.image_x_size = self.option['option']['image_x_size']
+        self.gamma = self.option['option']['gamma']
         self.image_channel = self.option['option']['image_channel']
         self.feature_output_size = self.option['network']['feature_output_size']
         self.data_format = self.option['option']['data_format']
@@ -125,30 +126,28 @@ class Network:
             return logits
 
     def _calculate_regression_loss(self, scope):
+        # 计算 batch loss
         with tf.name_scope(scope):
-            # 计算 batch loss
+            # online part
             online_q_values = tf.reshape(self.online_q_values, shape=(-1, self.n_action))
-            target_q_values = tf.reshape(self.target_q_values, shape=(-1, self.n_action))
-            target_q_value = tf.math.reduce_max(target_q_values, axis=1)
-            target_q_value = tf.reshape(target_q_value, shape=(-1, 1))
-            target_q_values = tf.tile(target_q_value,
-                tf.constant([1, self.n_action], dtype=tf.int32))
             action_mask = tf.reshape(self.action_mask, shape=(-1, self.n_action))
-            reward = tf.reshape(self.reward, shape=(-1, self.n_action))
-            is_end = tf.reshape(self.is_end, shape=(-1, self.n_action))
-            y_hat = self.online_q_values * action_mask
-            y_hat = tf.reshape(y_hat, shape=(-1, 1))
-            y = tf.stop_gradient((reward + (1.0 - is_end) * target_q_values) * action_mask)
-            y = tf.reshape(y, shape=(-1, 1))
-            y = tf.Print(y, [y], 'y', summarize=10000)
-            y_hat = tf.Print(y_hat, [y_hat], 'y_hat', summarize=10000)
-            batch_loss = tf.keras.losses.MSE(y_hat, y)
-            batch_loss = tf.Print(batch_loss, [batch_loss], 'batch_loss', summarize=10000)
-            avg_loss = tf.reduce_sum(batch_loss * self.coef) / \
-                (tf.reduce_sum(self.coef) * self.n_action)
-            avg_loss = tf.Print(avg_loss, [avg_loss], 'avg_loss', summarize=10000)
+            y_hat = tf.reduce_sum(online_q_values * action_mask, axis=1)
+            y_hat = tf.reshape(y_hat, shape=(-1,))
+            mean_q_value = tf.reduce_mean(tf.reduce_max(online_q_values, axis=1))
 
-        return avg_loss
+            # target part
+            target_q_values = tf.reshape(self.target_q_values, shape=(-1, self.n_action))
+            target_q_value = tf.reduce_max(target_q_values, axis=1)
+            reward = tf.reshape(self.reward, shape=(-1,))
+            is_end = tf.reshape(self.is_end, shape=(-1,))
+            y = reward + (1.0 - is_end) * self.gamma * tf.stop_gradient(target_q_value)
+            y = tf.reshape(y, shape=(-1,))
+            # y = tf.Print(y, [y], 'y', summarize=10000)
+            # y_hat = tf.Print(y_hat, [y_hat], 'y_hat', summarize=10000)
+
+            avg_loss = tf.losses.huber_loss(y, y_hat, reduction=tf.losses.Reduction.MEAN)
+
+        return avg_loss, mean_q_value
 
     def get_regression_loss(self, place_holders):
         """
@@ -166,9 +165,9 @@ class Network:
             self.online_image, 'online', is_training=tf.constant(True))
         self.target_q_values = self._inference(
             self.target_image, 'target', is_training=tf.constant(True))
-        self.avg_loss = self._calculate_regression_loss(scope='online')
+        self.avg_loss, self.mean_q_value = self._calculate_regression_loss(scope='online')
 
-        return self.avg_loss
+        return self.avg_loss, self.mean_q_value
 
     def get_inference(self, place_holders):
         """
@@ -176,7 +175,7 @@ class Network:
         """
         self.online_image = place_holders['online_image']
         self.online_q_values = self._inference(
-            self.online_image, 'online', is_training=tf.constant(True))
+            self.online_image, 'online', is_training=tf.constant(False))
         self.online_q_values = tf.reshape(self.online_q_values, shape=(-1, self.n_action))
 
         return self.online_q_values
