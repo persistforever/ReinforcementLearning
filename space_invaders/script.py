@@ -54,6 +54,11 @@ class Starter:
             os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
             self.model.train()
 
+        elif method == 'play':
+            # 训练模型
+            os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
+            self.model.play()
+
 
 if __name__ == '__main__':
     print(('current process id: %d' % (os.getpid())))
@@ -67,8 +72,8 @@ if __name__ == '__main__':
 
     # for debug
     if True:
-        whole_method = 'train'
-        whole_config_path = '/home/caory/github/ReinforcementLearning/scripts/space_invaders_v1/config_dqn.yaml'
+        whole_method = 'play'
+        whole_config_path = 'E:/Github/ReinforcementLearning/scripts/space_invaders_v1/config_dqn.yaml'
 
     starter = Starter(method=whole_method, config_path=whole_config_path)
     starter.main(method=whole_method)
