@@ -105,29 +105,45 @@ class Network:
         给定输入后，经由网络计算给出输出
         """
         with tf.name_scope(scope):
-            # row feature part: (84, 84, 4) to (7, 7, 16)
+            # row feature part: (84, 84, 4) to (11, 11, 64)
             hidden_tensor = input_image
-            for layer_config in self.option['network']['layers'][scope][:-2]:
+            for layer_config in self.option['network']['layers'][scope][0:3]:
                 layer = self.layers[layer_config['name']]
                 hidden_tensor = layer.get_output(input=hidden_tensor, is_training=is_training)
             feature_output_tensor = hidden_tensor
 
-            # reshape part: (7, 7, 16) to (784, )
+            # reshape part: (11, 11, 64) to (7744, )
             classify_input_tensor = tf.reshape(feature_output_tensor,
                 (-1, self.option['network']['feature_output_size']))
 
-            # classify part: (784, ) to (6, )
-            hidden_tensor = classify_input_tensor
-            for layer_config in self.option['network']['layers'][scope][-2:]:
-                layer = self.layers[layer_config['name']]
-                hidden_tensor = layer.get_output(input=hidden_tensor, is_training=is_training)
-            logits = tf.reshape(hidden_tensor, shape=(-1, self.n_action))
+            # classify part: (7744, ) to (4, )
+            if self.option['option']['is_use_dueling']:
+                layer = self.layers['%s_dense1' % (scope)]
+                hidden_tensor = layer.get_output(
+                    input=classify_input_tensor, is_training=is_training)
+                action_layer = self.layers['%s_dense2' % (scope)]
+                action_values = action_layer.get_output(
+                    input=hidden_tensor, is_training=is_training)
+                state_layer = self.layers['%s_dense3' % (scope)]
+                state_values = state_layer.get_output(
+                    input=hidden_tensor, is_training=is_training)
+                adv_values = state_values - \
+                    tf.reduce_mean(action_values, axis=1, keep_dims=True)
+                q_values = adv_values + action_values
+            else:
+                hidden_tensor = classify_input_tensor
+                for layer_config in self.option['network']['layers'][scope][3:5]:
+                    layer = self.layers[layer_config['name']]
+                    hidden_tensor = layer.get_output(input=hidden_tensor, is_training=is_training)
+                q_values = tf.reshape(hidden_tensor, shape=(-1, self.n_action))
 
-            return logits
+            return q_values
 
     def _calculate_regression_loss(self, scope):
         # 计算 batch loss
         with tf.name_scope(scope):
+            self.online_q_values = self._inference(
+                self.online_image, 'online', is_training=tf.constant(True))
             # online part
             online_q_values = tf.reshape(self.online_q_values, shape=(-1, self.n_action))
             action_mask = tf.reshape(self.action_mask, shape=(-1, self.n_action))
@@ -136,14 +152,25 @@ class Network:
             mean_q_value = tf.reduce_mean(tf.reduce_max(online_q_values, axis=1))
 
             # target part
-            target_q_values = tf.reshape(self.target_q_values, shape=(-1, self.n_action))
-            target_q_value = tf.reduce_max(target_q_values, axis=1)
-            reward = tf.reshape(self.reward, shape=(-1,))
+            self.target_q_values = self._inference(
+                self.target_image, 'target', is_training=tf.constant(True))
+            if self.option['option']['is_use_double']:
+                self.target_q_values_by_online = self._inference(
+                    self.target_image, 'online', is_training=tf.constant(True))
+                greedy_choice = tf.argmax(self.target_q_values_by_online, axis=1)
+                predict_onehot = tf.one_hot(greedy_choice, self.n_action, 1.0, 0.0)
+                predict_onehot = tf.reshape(predict_onehot, shape=(-1, self.n_action))
+                target_q_values = tf.reshape(self.target_q_values, shape=(-1, self.n_action))
+                target_q_value = tf.reduce_sum(target_q_values * predict_onehot, axis=1)
+            else:
+                target_q_values = tf.reshape(self.target_q_values, shape=(-1, self.n_action))
+                target_q_value = tf.reduce_max(target_q_values, axis=1)
+            reward = tf.clip_by_value(self.reward, -1, 1)
+            reward = tf.reshape(reward, shape=(-1,))
             is_end = tf.reshape(self.is_end, shape=(-1,))
             y = reward + (1.0 - is_end) * self.gamma * tf.stop_gradient(target_q_value)
             y = tf.reshape(y, shape=(-1,))
             # y = tf.Print(y, [y], 'y', summarize=10000)
-            # y_hat = tf.Print(y_hat, [y_hat], 'y_hat', summarize=10000)
 
             avg_loss = tf.losses.huber_loss(y, y_hat, reduction=tf.losses.Reduction.MEAN)
 
@@ -161,10 +188,6 @@ class Network:
         self.coef = place_holders['coef']
 
         # 待输出的中间变量
-        self.online_q_values = self._inference(
-            self.online_image, 'online', is_training=tf.constant(True))
-        self.target_q_values = self._inference(
-            self.target_image, 'target', is_training=tf.constant(True))
         self.avg_loss, self.mean_q_value = self._calculate_regression_loss(scope='online')
 
         return self.avg_loss, self.mean_q_value

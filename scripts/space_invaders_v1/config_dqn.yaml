@@ -14,12 +14,14 @@ option:
     data_format: "channels_first"
     is_time_major: True
     update_function: "rmsprop"
+    is_use_double: True
+    is_use_dueling: True
 
     # data
     logs_dir: "/home/caory/data/PDFInsight/deep_rl/logs/"
     seq: "space_invaders_v1"
-    model_name: "dqn"
-    log_path: "/home/caory/data/PDFInsight/deep_rl/logs/space_invaders_v1/train_logs/dqn.log"
+    model_name: "dueling_ddqn"
+    log_path: "/home/caory/data/PDFInsight/deep_rl/logs/space_invaders_v1/train_logs/dueling_ddqn.log"
 
     # train
     n_producer: 1
@@ -30,7 +32,7 @@ option:
     n_gpus: 1
     gpus: "0"
     train_gpus: "0"
-    learning_rate: 0.001
+    learning_rate: 0.0005
     gamma: 0.99
     epsilon_start: 1.0
     epsilon_end: 0.1
@@ -97,6 +99,7 @@ network:
             - {name: "online_conv3", type: "conv", x_size: 3, y_size: 3, x_stride: 1, y_stride: 1, n_filter: 64, activation: "leaky_relu", bn: False, prev: "online_conv2"}
             - {name: "online_dense1", type: "dense", hidden_dim: 512, activation: "leaky_relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
             - {name: "online_dense2", type: "dense", hidden_dim: 4, activation: "none", bn: False, prev: "online_dense1"}
+            - {name: "online_dense3", type: "dense", hidden_dim: 1, activation: "none", bn: False, prev: "online_dense1"}
 
         target:
             - {name: "target_conv1", type: "conv", x_size: 8, y_size: 8, x_stride: 4, y_stride: 4, n_filter: 32, activation: "leaky_relu", bn: False, prev: "none", input_shape: "feature_input_shape"}
@@ -104,3 +107,4 @@ network:
             - {name: "target_conv3", type: "conv", x_size: 3, y_size: 3, x_stride: 1, y_stride: 1, n_filter: 64, activation: "leaky_relu", bn: False, prev: "target_conv2"}
             - {name: "target_dense1", type: "dense", hidden_dim: 512, activation: "leaky_relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
             - {name: "target_dense2", type: "dense", hidden_dim: 4, activation: "none", bn: False, prev: "target_dense1"}
+            - {name: "target_dense3", type: "dense", hidden_dim: 1, activation: "none", bn: False, prev: "target_dense1"}

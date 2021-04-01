@@ -138,7 +138,7 @@ class Model:
 
     def resize_keepdims(self, im, size):
         # Opencv's resize remove the extra dimension for grayscale images. We add it back.
-        ret = cv2.resize(im, size)
+        ret = cv2.cv2.resize(im, size)
         if im.ndim == 3 and ret.ndim == 2:
             ret = ret[:, :, numpy.newaxis]
         return ret
@@ -148,7 +148,7 @@ class Model:
         训练模型
         """
         # 初始化环境
-        self.env = AtariPlayer(self.option['option']['env_path'], max_num_frames=60000)
+        self.env = AtariPlayer(self.option['option']['env_path'], frame_skip=4)
         self.env = FireResetEnv(self.env)
         self.env = MapState(self.env,
             lambda im: self.resize_keepdims(im, (self.image_y_size, self.image_x_size)))
@@ -177,6 +177,7 @@ class Model:
         start_time = time.time()
         obs = self.env.reset()
         episode = []
+        max_mean_reward = 0.0
         for i in tqdm(range(self.option['option']['init_memory_size'])):
             # 存入memory
             action = random.choice(list(range(self.n_action)))
@@ -206,12 +207,12 @@ class Model:
         recent_obs_list.append(obs)
         episode = []
         rewards = []
+        rewards_list = []
 
         max_epoch = self.option['option']['max_frame'] // \
             self.option['option']['log_frame_freq']
         for n_epoch in range(1, max_epoch+1):
             # 初始化一个epoch内的变量
-            rewards_list = []
             pred_values = []
             losses = []
 
@@ -255,17 +256,19 @@ class Model:
                 # 如果episode结束，则初始化一些变量
                 if is_end:
                     obs = self.env.reset()
+                    recent_obs_list = []
+                    for _ in range(self.option['option']['n_history']-1):
+                        blank = numpy.zeros(
+                            (self.image_y_size, self.image_x_size), dtype='uint8')
+                        recent_obs_list.append(blank)
+                    recent_obs_list.append(obs)
                     if 'ale.lives' not in info or info['ale.lives'] == 0:
-                        recent_obs_list = []
-                        for _ in range(self.option['option']['n_history']-1):
-                            blank = numpy.zeros(
-                                (self.image_y_size, self.image_x_size), dtype='uint8')
-                            recent_obs_list.append(blank)
-                        recent_obs_list.append(obs)
                         for sample in episode:
                             self.processor.put_to_memory(sample)
                         episode = []
                         rewards_list.append(rewards)
+                        if len(rewards_list) >= 50:
+                            del rewards_list[0]
                         rewards = []
 
                 # 训练
@@ -287,19 +290,19 @@ class Model:
                             output_path = os.path.join(self.logs_dir, 'train_images',
                                 '%d_state_%d_%d_%d_%d.jpg' % (
                                     j, k, action, int(reward), int(is_end)))
-                            cv2.imwrite(output_path, pic)
+                            cv2.cv2.imwrite(output_path, pic)
                         for k in range(self.option['option']['n_history']):
                             pic = next_state[k]
                             output_path = os.path.join(self.logs_dir, 'train_images',
                                 '%d_nextstate_%d_%d_%d_%d.jpg' % (
                                     j, k, action, int(reward), int(is_end)))
-                            cv2.imwrite(output_path, pic)
+                            cv2.cv2.imwrite(output_path, pic)
                         for k in range(-self.option['option']['n_history']+1, 2):
                             pic = self.processor.memory_buffer[index+k]['obs']
                             output_path = os.path.join(self.logs_dir, 'train_images',
                                 '%d_memory_%d_%d_%d_%d.jpg' % (
                                     j, k, action, int(reward), int(is_end)))
-                            cv2.imwrite(output_path, pic)
+                            cv2.cv2.imwrite(output_path, pic)
 
                 # 获取batch_phs
                 batch_phs = {}
@@ -323,7 +326,6 @@ class Model:
                 [_, avg_loss, mean_q_value] = self.sess.run(
                     fetches=[self.optimizer_handle, self.avg_loss, self.mean_q_value],
                     feed_dict=feed_dict)
-                avg_loss = avg_loss / self.batch_size
                 losses.append(avg_loss)
                 pred_values.append(mean_q_value)
 
@@ -339,14 +341,35 @@ class Model:
             max_reward = max([sum(rewards) for rewards in rewards_list])
             mean_reward = 1.0 * sum(
                 [sum(rewards) for rewards in rewards_list]) / len(rewards_list)
-            mean_value = 1.0 * sum(pred_values) / (len(pred_values) + 1e-8)
-            avg_loss = 1.0 * sum(losses) / len(losses)
+            mean_value = 1.0 * numpy.mean(pred_values)
+            avg_loss = 1.0 * numpy.mean(losses)
             logging.info('[epoch=%d] max reward: %d, mean reward: %.2f, '
                 'avg loss: %.4f, mean value: %.4f' % (
-                n_epoch, max_reward, mean_reward, mean_value, avg_loss))
+                n_epoch, max_reward, mean_reward, avg_loss, mean_value))
             logging.info('')
 
             # 保存模型
+            if mean_reward >= max_mean_reward:
+                max_mean_reward = mean_reward
+                with self.network.graph.as_default():
+                    if self.saver is None:
+                        self.saver = tf.train.Saver(
+                            var_list=tf.global_variables(),
+                            write_version=tf.train.SaverDef.V2, max_to_keep=100)
+                    if not os.path.exists(os.path.join(self.logs_dir,
+                        self.option['option']['model_name'])):
+                        os.mkdir(os.path.join(self.logs_dir,
+                            self.option['option']['model_name']))
+                    if not os.path.exists(
+                        os.path.join(self.logs_dir,
+                            self.option['option']['model_name'], 'best')):
+                        os.mkdir(os.path.join(self.logs_dir,
+                            self.option['option']['model_name'], 'best'))
+                    model_path = os.path.join(self.logs_dir,
+                        self.option['option']['model_name'],
+                        'best', 'tensorflow.ckpt')
+                    self.saver.save(self.sess, model_path)
+
             if n_epoch % self.option['option']['save_epoch_freq'] == 0:
                 with self.network.graph.as_default():
                     if self.saver is None:

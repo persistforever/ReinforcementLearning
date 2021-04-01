@@ -71,7 +71,7 @@ if __name__ == '__main__':
     whole_config_path = arg.config
 
     # for debug
-    if True:
+    if False:
         whole_method = 'play'
         whole_config_path = 'E:/Github/ReinforcementLearning/scripts/space_invaders_v1/config_dqn.yaml'
 
