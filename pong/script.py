@@ -8,10 +8,10 @@ import random
 import copy
 import numpy
 import yaml
-from space_invaders.data import Processor
-from space_invaders.network import Network
-from space_invaders.model import Model
-import space_invaders.utils as utils
+from pong.data import Processor
+from pong.network import Network
+from pong.model import Model
+import pong.utils as utils
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
 
@@ -50,6 +50,11 @@ class Starter:
     def main(self, method='train', gpus=''):
 
         if method == 'train':
+            # debug
+            os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
+            self.model.debug()
+
+        elif method == 'train':
             # 训练模型
             os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
             self.model.train()
@@ -71,9 +76,9 @@ if __name__ == '__main__':
     whole_config_path = arg.config
 
     # for debug
-    if False:
-        whole_method = 'play'
-        whole_config_path = 'E:/Github/ReinforcementLearning/scripts/space_invaders_v1/config_dqn.yaml'
+    if True:
+        whole_method = 'debug'
+        whole_config_path = 'E:/Github/ReinforcementLearning/scripts/pong_v1/config_pg.yaml'
 
     starter = Starter(method=whole_method, config_path=whole_config_path)
     starter.main(method=whole_method)

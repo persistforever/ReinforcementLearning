@@ -16,9 +16,9 @@ import numpy
 import tensorflow as tf
 import gym
 import cv2
-import space_invaders.utils as utils
-from space_invaders.atari import AtariPlayer
-from space_invaders.atari_wrapper import FireResetEnv, FrameStack, LimitLength, MapState
+import pong.utils as utils
+from pong.atari import AtariPlayer
+from pong.atari_wrapper import FireResetEnv, FrameStack, LimitLength, MapState
 
 
 class Model:
@@ -142,6 +142,22 @@ class Model:
         if im.ndim == 3 and ret.ndim == 2:
             ret = ret[:, :, numpy.newaxis]
         return ret
+
+    def debug(self):
+        """debug
+        """
+        # 初始化环境
+        self.env = AtariPlayer(self.option['option']['env_path'], frame_skip=4)
+        self.env = FireResetEnv(self.env)
+        self.env = MapState(self.env,
+            lambda im: self.resize_keepdims(im, (self.image_y_size, self.image_x_size)))
+        obs = self.env.reset()
+        while True:
+            # 存入memory
+            action = random.choice(list(range(self.n_action)))
+            next_obs, reward, is_end, info = self.env.step(action)
+            if is_end:
+                obs = self.env.reset()
 
     def train(self):
         """

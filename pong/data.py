@@ -12,7 +12,7 @@ import copy
 import multiprocessing as mp
 import numpy
 import cv2
-import space_invaders.utils as utils
+import pong.utils as utils
 
 
 class Processor:
