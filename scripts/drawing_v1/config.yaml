@@ -1,0 +1,15 @@
+desp: "building drawing"
+option:
+    # env
+    main_dir: "/home/caory/data/datasets/building_drawing/20210707/drawings/"
+    debug_dir: "/home/caory/data/datasets/building_drawing/20210707/debug/render/"
+
+    # data
+    logs_dir: "/home/caory/data/PDFInsight/deep_rl/logs/"
+    seq: "drawing_v1"
+    scale: 20
+    move_ratio: 5
+
+    # model
+    gpus: ""
+    seed: 12

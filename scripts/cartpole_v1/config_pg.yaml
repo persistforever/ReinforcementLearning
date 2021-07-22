@@ -4,7 +4,7 @@ option:
     env_path: "/home/caory/github/ReinforcementLearning/pong/pong.bin"
 
     # model
-    n_action: &n_action 6
+    n_action: &n_action 2
     n_history: &n_history 4
     image_y_size: &image_y_size 84
     image_x_size: &image_x_size 84
@@ -70,19 +70,11 @@ option:
 
 # framework
 network:
-    feature_input_shape:
-        - *image_y_size
-        - *image_x_size
-        - *image_channel
-
-    feature_output_size: &feature_output_size 7744
+    classify_input_size: &classify_input_size 4
     classify_input_shape:
-        - *feature_output_size
+        - *classify_input_size
 
     layers:
         target:
-            - {name: "target_conv1", type: "conv", x_size: 8, y_size: 8, x_stride: 4, y_stride: 4, n_filter: 32, activation: "leaky_relu", bn: False, prev: "none", input_shape: "feature_input_shape"}
-            - {name: "target_conv2", type: "conv", x_size: 4, y_size: 4, x_stride: 2, y_stride: 2, n_filter: 64, activation: "leaky_relu", bn: False, prev: "target_conv1"}
-            - {name: "target_conv3", type: "conv", x_size: 3, y_size: 3, x_stride: 1, y_stride: 1, n_filter: 64, activation: "leaky_relu", bn: False, prev: "target_conv2"}
-            - {name: "target_dense1", type: "dense", hidden_dim: 512, activation: "leaky_relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
-            - {name: "target_dense2", type: "dense", hidden_dim: 6, activation: "none", bn: False, prev: "target_dense1"}
+            - {name: "target_dense1", type: "dense", hidden_dim: 16, activation: "relu", bn: False, prev: "none", input_shape: "classify_input_shape"}
+            - {name: "target_dense2", type: "dense", hidden_dim: 2, activation: "none", bn: False, prev: "target_dense1"}

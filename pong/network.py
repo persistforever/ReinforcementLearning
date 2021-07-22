@@ -32,7 +32,7 @@ class Network:
         self.layers = {}
 
         with self.graph.as_default():
-            for scope in ['online', 'target']:
+            for scope in ['target']:
                 with tf.name_scope(scope):
                     # 定义layers
                     for layer_dict in self.option['network']['layers'][scope]:
@@ -116,89 +116,54 @@ class Network:
             classify_input_tensor = tf.reshape(feature_output_tensor,
                 (-1, self.option['network']['feature_output_size']))
 
-            # classify part: (7744, ) to (4, )
-            if self.option['option']['is_use_dueling']:
-                layer = self.layers['%s_dense1' % (scope)]
-                hidden_tensor = layer.get_output(
-                    input=classify_input_tensor, is_training=is_training)
-                action_layer = self.layers['%s_dense2' % (scope)]
-                action_values = action_layer.get_output(
-                    input=hidden_tensor, is_training=is_training)
-                state_layer = self.layers['%s_dense3' % (scope)]
-                state_values = state_layer.get_output(
-                    input=hidden_tensor, is_training=is_training)
-                adv_values = state_values - \
-                    tf.reduce_mean(action_values, axis=1, keep_dims=True)
-                q_values = adv_values + action_values
-            else:
-                hidden_tensor = classify_input_tensor
-                for layer_config in self.option['network']['layers'][scope][3:5]:
-                    layer = self.layers[layer_config['name']]
-                    hidden_tensor = layer.get_output(input=hidden_tensor, is_training=is_training)
-                q_values = tf.reshape(hidden_tensor, shape=(-1, self.n_action))
+            # classify part: (7744, ) to (6, )
+            hidden_tensor = classify_input_tensor
+            for layer_config in self.option['network']['layers'][scope][3:5]:
+                layer = self.layers[layer_config['name']]
+                hidden_tensor = layer.get_output(input=hidden_tensor, is_training=is_training)
+            probs = tf.nn.softmax(tf.reshape(hidden_tensor, shape=(-1, self.n_action)))
 
-            return q_values
+            return probs
 
     def _calculate_regression_loss(self, scope):
         # 计算 batch loss
         with tf.name_scope(scope):
-            self.online_q_values = self._inference(
-                self.online_image, 'online', is_training=tf.constant(True))
-            # online part
-            online_q_values = tf.reshape(self.online_q_values, shape=(-1, self.n_action))
+            self.action_probs = self._inference(
+                self.image, 'target', is_training=tf.constant(True))
+            action_probs = tf.reshape(self.action_probs, shape=(-1, self.n_action))
+            action_probs = tf.Print(action_probs, [action_probs], 'action_probs1:', summarize=100000)
             action_mask = tf.reshape(self.action_mask, shape=(-1, self.n_action))
-            y_hat = tf.reduce_sum(online_q_values * action_mask, axis=1)
-            y_hat = tf.reshape(y_hat, shape=(-1,))
-            mean_q_value = tf.reduce_mean(tf.reduce_max(online_q_values, axis=1))
+            action_probs = tf.reduce_max(action_probs * action_mask, axis=1)
+            action_probs = tf.reshape(action_probs, shape=(-1,))
+            action_probs = tf.Print(action_probs, [action_probs], 'action_probs:', summarize=100000)
+            reward = self.reward[-1, 0]
+            reward = tf.Print(reward, [reward], 'reward:', summarize=100000)
+            avg_loss = tf.reduce_sum(- tf.log(action_probs + 1e-12) * reward)
 
-            # target part
-            self.target_q_values = self._inference(
-                self.target_image, 'target', is_training=tf.constant(True))
-            if self.option['option']['is_use_double']:
-                self.target_q_values_by_online = self._inference(
-                    self.target_image, 'online', is_training=tf.constant(True))
-                greedy_choice = tf.argmax(self.target_q_values_by_online, axis=1)
-                predict_onehot = tf.one_hot(greedy_choice, self.n_action, 1.0, 0.0)
-                predict_onehot = tf.reshape(predict_onehot, shape=(-1, self.n_action))
-                target_q_values = tf.reshape(self.target_q_values, shape=(-1, self.n_action))
-                target_q_value = tf.reduce_sum(target_q_values * predict_onehot, axis=1)
-            else:
-                target_q_values = tf.reshape(self.target_q_values, shape=(-1, self.n_action))
-                target_q_value = tf.reduce_max(target_q_values, axis=1)
-            reward = tf.clip_by_value(self.reward, -1, 1)
-            reward = tf.reshape(reward, shape=(-1,))
-            is_end = tf.reshape(self.is_end, shape=(-1,))
-            y = reward + (1.0 - is_end) * self.gamma * tf.stop_gradient(target_q_value)
-            y = tf.reshape(y, shape=(-1,))
-            # y = tf.Print(y, [y], 'y', summarize=10000)
-
-            avg_loss = tf.losses.huber_loss(y, y_hat, reduction=tf.losses.Reduction.MEAN)
-
-        return avg_loss, mean_q_value
+        return avg_loss
 
     def get_regression_loss(self, place_holders):
         """
         给定一批输入，获得该批的总loss
         """
-        self.online_image = place_holders['online_image']
-        self.target_image = place_holders['target_image']
+        self.image = place_holders['image']
         self.action_mask = place_holders['action_mask']
         self.reward = place_holders['reward']
-        self.is_end = place_holders['is_end']
         self.coef = place_holders['coef']
 
         # 待输出的中间变量
-        self.avg_loss, self.mean_q_value = self._calculate_regression_loss(scope='online')
+        self.avg_loss = self._calculate_regression_loss(scope='target')
 
-        return self.avg_loss, self.mean_q_value
+        return self.avg_loss
 
     def get_inference(self, place_holders):
         """
-        给定一批输入，获得该批的q_values
+        给定一批输入，获得该批的action probs
         """
-        self.online_image = place_holders['online_image']
-        self.online_q_values = self._inference(
-            self.online_image, 'online', is_training=tf.constant(False))
-        self.online_q_values = tf.reshape(self.online_q_values, shape=(-1, self.n_action))
+        self.image = place_holders['image']
+        self.action_probs = self._inference(
+            self.image, 'target', is_training=tf.constant(False))
+        self.action_probs = tf.reshape(
+            self.action_probs, shape=(-1, self.n_action))
 
-        return self.online_q_values
+        return self.action_probs

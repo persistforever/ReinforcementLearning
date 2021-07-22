@@ -1,17 +1,14 @@
 # -*- coding: utf8 -*-
 # author: ronniecao
-# time: 2021/03/22
-# description: start script of space_invaders
+# time: 2021/07/22
+# description: start script of scheduling
 import argparse
 import os
 import random
-import copy
 import numpy
 import yaml
-from pong.network import Network
-from pong.data import Processor
-from pong.model import Model
-import pong.utils as utils
+from scheduler.env import Env
+from scheduler.model import Model
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
 
@@ -25,26 +22,16 @@ class Starter:
         random.seed(self.option['option']['seed'])
         numpy.random.seed(self.option['option']['seed'])
 
-        # 实例化网络模块
-        self.network = Network(
-            option=self.option,
-            name='network')
-        print('Create Network instance network')
-
-        # 实例化数据模块
-        self.processor = Processor(
-            option=self.option,
-            logs_dir=os.path.join(
-                self.option['option']['logs_dir'], self.option['option']['seq']))
-        print('Create Processor instance network')
+        # 实例化环境模块
+        self.env = Env(option=self.option)
+        print('Create Env instance env')
 
         # 实例化模型模块
         self.model = Model(
             option=self.option,
             logs_dir=os.path.join(
                 self.option['option']['logs_dir'], self.option['option']['seq']),
-            processor=self.processor,
-            network=self.network)
+            env=self.env)
         print('Create Model instance model')
 
     def main(self, method='train', gpus=''):
@@ -53,16 +40,6 @@ class Starter:
             # debug
             os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
             self.model.debug()
-
-        elif method == 'train':
-            # 训练模型
-            os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
-            self.model.train()
-
-        elif method == 'play':
-            # 训练模型
-            os.environ['CUDA_VISIBLE_DEVICES'] = self.option['option']['gpus']
-            self.model.play()
 
 
 if __name__ == '__main__':
@@ -77,8 +54,8 @@ if __name__ == '__main__':
 
     # for debug
     if True:
-        whole_method = 'train'
-        whole_config_path = '/home/caory/github/ReinforcementLearning/scripts/pong_v1/config_pg.yaml'
+        whole_method = 'debug'
+        whole_config_path = '/home/caory/github/ReinforcementLearning/scripts/scheduling_v1/config.yaml'
 
     starter = Starter(method=whole_method, config_path=whole_config_path)
     starter.main(method=whole_method)

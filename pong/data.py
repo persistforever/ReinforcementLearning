@@ -12,7 +12,7 @@ import copy
 import multiprocessing as mp
 import numpy
 import cv2
-import pong.utils as utils
+import space_invaders.utils as utils
 
 
 class Processor:
@@ -42,28 +42,10 @@ class Processor:
                 'size': size, 'dtype': dtype,
                 'value': numpy.zeros(size, dtype=dtype)}
 
-        # online image
-        state = numpy.stack(example['state'], axis=2)
-        state = 1.0 * state / 255.0
-        sample_ph['online_image']['value'] = state
-
-        # target image
-        if example['next_state'] is not None:
-            next_state = numpy.stack(example['next_state'], axis=2)
-            next_state = 1.0 * next_state / 255.0
-            sample_ph['target_image']['value'] = next_state
-
-            # action_mask
-            action = example['action']
-            sample_ph['action_mask']['value'][action, 0] = 1.0
-
-            # reward
-            sample_ph['reward']['value'][0] = example['reward']
-
-            # is end
-            sample_ph['is_end']['value'][0] = example['is_end']
-
-        # coef
+        sample_ph['image']['value'] = \
+            1.0 * numpy.stack(example['state'], axis=2) / 255.0
+        sample_ph['action_mask']['value'][example['action']] = 1.0
+        sample_ph['reward']['value'][0] = example['reward']
         sample_ph['coef']['value'][0] = 1.0
 
         return sample_ph
@@ -101,15 +83,6 @@ class Processor:
                 state.append(self.memory_buffer[index-i]['obs'])
         state = state[::-1]
 
-        # 获取next state
-        next_state = state[1:]
-        if is_end:
-            blank = numpy.zeros((self.image_y_size, self.image_x_size), dtype='uint8')
-            next_state.append(blank)
-        else:
-            next_state.append(self.memory_buffer[index+1]['obs'])
-
-        example = {'index': index, 'state': state, 'action': action, 'reward': reward,
-            'is_end': is_end, 'next_state': next_state}
+        example = {'index': index, 'state': state, 'action': action, 'reward': reward}
 
         return example

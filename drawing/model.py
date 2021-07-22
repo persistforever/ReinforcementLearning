@@ -1,47 +1,29 @@
 # -*- coding: utf8 -*-
 # author: ronniecao
 # time: 2021/03/22
-# description: model managering of space_invaders
+# description: model managering of drawing
 import os
-import re
 import copy
-import time
+import itertools
 import random
 import json
-import collections
-import multiprocessing as mp
-from tqdm import tqdm
 import logging
 import numpy
 import tensorflow as tf
-import gym
 import cv2
 import pong.utils as utils
-from pong.atari import AtariPlayer
-from pong.atari_wrapper import FireResetEnv, FrameStack, LimitLength, MapState
 
 
 class Model:
     """
     模型类：控制模型训练、验证、预测和应用
     """
-    def __init__(self, option, logs_dir, processor, network):
+    def __init__(self, option, logs_dir, env):
 
         # 读取配置
         self.option = option
         self.logs_dir = logs_dir
-        self.processor = processor
-        self.network = network
-
-        # 设置参数
-        self.image_y_size = self.option['option']['image_y_size']
-        self.image_x_size = self.option['option']['image_x_size']
-        self.n_action = self.option['option']['n_action']
-        self.learning_rate = self.option['option']['learning_rate']
-        self.update_function = self.option['option']['update_function']
-        self.batch_size = self.option['option']['batch_size']
-        self.n_gpus = self.option['option']['n_gpus']
-        self.gamma = self.option['option']['gamma']
+        self.env = env
 
     def _set_place_holders(self):
         """
@@ -138,25 +120,98 @@ class Model:
         debug
         """
         # 初始化环境
-        self.env = AtariPlayer(self.option['option']['env_path'], frame_skip=4)
-        self.env = FireResetEnv(self.env)
-        self.env = MapState(self.env,
-            lambda im: self.resize_keepdims(im, (self.image_y_size, self.image_x_size)))
-        obs = self.env.reset()
-        n = 0
-        while True:
-            # 存入memory
-            n += 1
-            action = random.choice(list(range(self.n_action)))
-            next_obs, reward, is_end, info = self.env.step(action)
-            if reward != 0:
-                is_end = True
-            path = os.path.join('/home/caory/programs/image/pong/%d.jpg' % (n))
-            cv2.imwrite(path, next_obs)
-            print(action, reward, is_end)
-            if is_end:
-                obs = self.env.reset()
-                break
+        for fname in os.listdir(self.option['option']['main_dir']):
+            if fname in ['20200811-LL-3f_dwgproc.json']:
+                continue
+            # if fname not in ['BEAM3_dwgproc.json']:
+            #     continue
+            self.picid = fname.split('.')[0]
+            path = os.path.join(self.option['option']['main_dir'], fname)
+            print(path)
+            info = self.env.reset(path)
+
+            # 获取图片
+            if not os.path.exists(os.path.join(
+                self.option['option']['debug_dir'], self.picid)):
+                os.mkdir((os.path.join(self.option['option']['debug_dir'], self.picid)))
+            output_path = os.path.join(
+                self.option['option']['debug_dir'], self.picid, '0.png')
+            cv2.imwrite(output_path, self.env.render(0))
+
+            # 开始循环
+            step = 1
+            action_jz_move_dict = {}
+            action_list = []
+            state_string = self.env.get_state_string(self.env.info)
+            state_dict = {state_string: None}
+            while True:
+                # 寻找reward最大的valid action_jz
+                _, text_overlap_list = self.env.get_text_overlap_area(self.env.info)
+                _, line_overlap_list = self.env.get_line_and_beam_overlap_area(self.env.info)
+                _, yw_overlap_list = self.env.get_jz_and_yw_overlap_area(self.env.info)
+                jzlabel_area = {}
+                for lida, lidb, area in text_overlap_list:
+                    if lida not in jzlabel_area:
+                        jzlabel_area[lida] = 0
+                    jzlabel_area[lida] += area
+                    if lidb not in jzlabel_area:
+                        jzlabel_area[lidb] = 0
+                    jzlabel_area[lidb] += area
+                for lid, _, area in yw_overlap_list:
+                    if lid not in jzlabel_area:
+                        jzlabel_area[lid] = 0
+                    jzlabel_area[lid] += area
+                for lid, _, area in line_overlap_list:
+                    if lid not in jzlabel_area:
+                        jzlabel_area[lid] = 0
+                    jzlabel_area[lid] += area
+                if len(jzlabel_area) == 0:
+                    break
+                action_jz = max(jzlabel_area.items(), key=lambda x: x[1])[0]
+
+                # 寻找reward最大的valid action_move
+                candidates = []
+                temp_info = copy.deepcopy(self.env.info)
+                for action_move in [0, 1, 2, 3, 4, 5]:
+                    jzlabel = self.env.info['jzlabel_dict'][action_jz]
+                    is_valid, new_jzlabel = self.env.move(
+                        jzlabel=jzlabel, move_type=action_move)
+                    temp_info['jzlabel_dict'][action_jz] = new_jzlabel
+                    state_string = self.env.get_state_string(temp_info)
+                    if state_string in state_dict:
+                        continue
+                    text_overlap_area, _ = self.env.get_text_overlap_area(temp_info)
+                    yw_overlap_area, _ = self.env.get_jz_and_yw_overlap_area(temp_info)
+                    line_overlap_area, _ = self.env.get_line_and_beam_overlap_area(temp_info)
+                    overlap_area = text_overlap_area + yw_overlap_area + line_overlap_area
+                    reward = self.env.info['overlap_area'] - overlap_area
+                    print(action_jz, action_move, is_valid, reward)
+                    if is_valid:
+                        candidates.append([action_jz, action_move, reward])
+                if len(candidates) == 0:
+                    continue
+
+                # 更新信息
+                action_jz, action_move, _ = max(candidates, key=lambda x: x[2])
+                action_list.append([action_jz, action_move])
+                state_dict[self.env.get_state_string(self.env.info)] = None
+
+                # 告诉环境采取的action
+                new_info, reward, is_end, is_valid = self.env.step(
+                    action=[action_jz, action_move])
+                print(new_info['overlap_area'] if new_info is not None else None,
+                    reward, is_end, is_valid)
+                print()
+
+                # 打印结果
+                output_path = os.path.join(
+                    self.option['option']['debug_dir'], self.picid, '%d.png' % (step))
+                cv2.imwrite(output_path, self.env.render(step))
+
+                if is_end:
+                    break
+
+                step += 1
 
     def train(self):
         """

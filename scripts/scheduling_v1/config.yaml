@@ -1,0 +1,18 @@
+desp: "scheduling"
+option:
+    # env
+    train_dir: "/home/caory/data/datasets/scheduling/20210713/workflow_train/"
+
+    # data
+    logs_dir: "/home/caory/data/PDFInsight/deep_rl/logs/"
+    seq: "scheduling_v1"
+
+    # model
+    gpus: ""
+    seed: 12
+
+    # draw
+    image_height: 4000
+    image_width: 2000
+    height: 10
+    job_offset: 20
