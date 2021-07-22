@@ -4,9 +4,7 @@
 # description: model managering of drawing
 import os
 import copy
-import itertools
-import random
-import json
+import time
 import logging
 import numpy
 import tensorflow as tf
@@ -121,26 +119,29 @@ class Model:
         """
         # 初始化环境
         for fname in os.listdir(self.option['option']['main_dir']):
-            if fname in ['20200811-LL-3f_dwgproc.json']:
-                continue
+            st = time.time()
+            # if fname not in ['20200811-LL-3f_dwgproc.json']:
+            #     continue
             # if fname not in ['BEAM3_dwgproc.json']:
             #     continue
             self.picid = fname.split('.')[0]
             path = os.path.join(self.option['option']['main_dir'], fname)
             print(path)
-            info = self.env.reset(path)
+
+            # 初始化
+            self.env.reset(path)
 
             # 获取图片
-            if not os.path.exists(os.path.join(
-                self.option['option']['debug_dir'], self.picid)):
-                os.mkdir((os.path.join(self.option['option']['debug_dir'], self.picid)))
-            output_path = os.path.join(
-                self.option['option']['debug_dir'], self.picid, '0.png')
-            cv2.imwrite(output_path, self.env.render(0))
+            if self.option['option']['is_draw']:
+                if not os.path.exists(os.path.join(
+                    self.option['option']['debug_dir'], self.picid)):
+                    os.mkdir((os.path.join(self.option['option']['debug_dir'], self.picid)))
+                output_path = os.path.join(
+                    self.option['option']['debug_dir'], self.picid, '0.png')
+                cv2.imwrite(output_path, self.env.render(0))
 
             # 开始循环
             step = 1
-            action_jz_move_dict = {}
             action_list = []
             state_string = self.env.get_state_string(self.env.info)
             state_dict = {state_string: None}
@@ -185,7 +186,7 @@ class Model:
                     line_overlap_area, _ = self.env.get_line_and_beam_overlap_area(temp_info)
                     overlap_area = text_overlap_area + yw_overlap_area + line_overlap_area
                     reward = self.env.info['overlap_area'] - overlap_area
-                    print(action_jz, action_move, is_valid, reward)
+                    # print(action_jz, action_move, is_valid, reward)
                     if is_valid:
                         candidates.append([action_jz, action_move, reward])
                 if len(candidates) == 0:
@@ -199,19 +200,23 @@ class Model:
                 # 告诉环境采取的action
                 new_info, reward, is_end, is_valid = self.env.step(
                     action=[action_jz, action_move])
-                print(new_info['overlap_area'] if new_info is not None else None,
-                    reward, is_end, is_valid)
-                print()
+                # print(new_info['overlap_area'] if new_info is not None else None,
+                #     reward, is_end, is_valid)
+                # print()
 
                 # 打印结果
-                output_path = os.path.join(
-                    self.option['option']['debug_dir'], self.picid, '%d.png' % (step))
-                cv2.imwrite(output_path, self.env.render(step))
+                if self.option['option']['is_draw']:
+                    output_path = os.path.join(
+                        self.option['option']['debug_dir'], self.picid, '%d.png' % (step))
+                    cv2.imwrite(output_path, self.env.render(step))
 
                 if is_end:
                     break
 
                 step += 1
+
+            et = time.time()
+            print('time consuming: %.2f seconds\n' % (et - st))
 
     def train(self):
         """

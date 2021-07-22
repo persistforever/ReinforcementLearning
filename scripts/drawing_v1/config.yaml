@@ -13,3 +13,4 @@ option:
     # model
     gpus: ""
     seed: 12
+    is_draw: False
