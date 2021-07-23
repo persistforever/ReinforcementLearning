@@ -2,7 +2,7 @@ desp: "building drawing"
 option:
     # env
     main_dir: "/home/caory/data/datasets/building_drawing/20210707/drawings/"
-    debug_dir: "/home/caory/data/datasets/building_drawing/20210707/debug/render/"
+    debug_dir: "/home/caory/data/datasets/building_drawing/20210707/debug/render_old/"
 
     # data
     logs_dir: "/home/caory/data/PDFInsight/deep_rl/logs/"
@@ -14,3 +14,4 @@ option:
     gpus: ""
     seed: 12
     is_draw: True
+    is_strict_jz_beam: False

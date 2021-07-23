@@ -150,7 +150,8 @@ class Model:
                 # 寻找reward最大的valid action_jz
                 _, text_overlap_list = self.env.get_text_overlap_area(self.env.info)
                 _, yw_overlap_list = self.env.get_jz_and_yw_overlap_area(self.env.info)
-                _, yw_beam_overlap_list = self.env.get_text_and_beam_overlap_area(self.env.info)
+                if self.option['option']['is_strict_jz_beam']:
+                    _, yw_beam_overlap_list = self.env.get_text_and_beam_overlap_area(self.env.info)
                 _, line_overlap_list = self.env.get_line_and_beam_overlap_area(self.env.info)
                 jzlabel_area = {}
                 for lida, lidb, area in text_overlap_list:
@@ -164,10 +165,11 @@ class Model:
                     if lid not in jzlabel_area:
                         jzlabel_area[lid] = 0
                     jzlabel_area[lid] += area
-                for lid, _, area in yw_beam_overlap_list:
-                    if lid not in jzlabel_area:
-                        jzlabel_area[lid] = 0
-                    jzlabel_area[lid] += area
+                if self.option['option']['is_strict_jz_beam']:
+                    for lid, _, area in yw_beam_overlap_list:
+                        if lid not in jzlabel_area:
+                            jzlabel_area[lid] = 0
+                        jzlabel_area[lid] += area
                 for lid, _, area in line_overlap_list:
                     if lid not in jzlabel_area:
                         jzlabel_area[lid] = 0
@@ -179,7 +181,9 @@ class Model:
                 # 寻找reward最大的valid action_move
                 candidates = []
                 temp_info = copy.deepcopy(self.env.info)
-                for action_move in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+                valid_actions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] if \
+                    self.option['option']['is_strict_jz_beam'] else [0, 1, 2, 3, 4, 5]
+                for action_move in valid_actions:
                     jzlabel = self.env.info['jzlabel_dict'][action_jz]
                     is_valid, new_jzlabel = self.env.move(
                         jzlabel=jzlabel, move_type=action_move)
@@ -189,12 +193,17 @@ class Model:
                         continue
                     text_overlap_area, _ = self.env.get_text_overlap_area(temp_info)
                     yw_overlap_area, _ = self.env.get_jz_and_yw_overlap_area(temp_info)
-                    yw_beam_overlap_area, _ = self.env.get_text_and_beam_overlap_area(temp_info)
+                    if self.option['option']['is_strict_jz_beam']:
+                        yw_beam_overlap_area, _ = \
+                            self.env.get_text_and_beam_overlap_area(temp_info)
                     line_overlap_area, _ = self.env.get_line_and_beam_overlap_area(temp_info)
-                    overlap_area = text_overlap_area + yw_overlap_area + \
-                        yw_beam_overlap_area + line_overlap_area
+                    if self.option['option']['is_strict_jz_beam']:
+                        overlap_area = text_overlap_area + yw_overlap_area + \
+                            yw_beam_overlap_area + line_overlap_area
+                    else:
+                        overlap_area = text_overlap_area + yw_overlap_area + \
+                            line_overlap_area
                     reward = self.env.info['overlap_area'] - overlap_area
-                    # print(action_jz, action_move, is_valid, reward)
                     if is_valid:
                         candidates.append([action_jz, action_move, reward])
                 if len(candidates) == 0:
