@@ -122,7 +122,7 @@ class Model:
             st = time.time()
             # if fname not in ['20200811-LL-3f_dwgproc.json']:
             #     continue
-            # if fname not in ['BEAM3_dwgproc.json']:
+            # if fname in ['PKPM-3f_dwgproc.json', 'PKPM-1f_dwgproc.json', '4-9f_dwgproc.json']:
             #     continue
             self.picid = fname.split('.')[0]
             path = os.path.join(self.option['option']['main_dir'], fname)
@@ -145,11 +145,13 @@ class Model:
             action_list = []
             state_string = self.env.get_state_string(self.env.info)
             state_dict = {state_string: None}
+            min_area, min_step = 1e10, 0
             while True:
                 # 寻找reward最大的valid action_jz
                 _, text_overlap_list = self.env.get_text_overlap_area(self.env.info)
-                _, line_overlap_list = self.env.get_line_and_beam_overlap_area(self.env.info)
                 _, yw_overlap_list = self.env.get_jz_and_yw_overlap_area(self.env.info)
+                _, yw_beam_overlap_list = self.env.get_text_and_beam_overlap_area(self.env.info)
+                _, line_overlap_list = self.env.get_line_and_beam_overlap_area(self.env.info)
                 jzlabel_area = {}
                 for lida, lidb, area in text_overlap_list:
                     if lida not in jzlabel_area:
@@ -159,6 +161,10 @@ class Model:
                         jzlabel_area[lidb] = 0
                     jzlabel_area[lidb] += area
                 for lid, _, area in yw_overlap_list:
+                    if lid not in jzlabel_area:
+                        jzlabel_area[lid] = 0
+                    jzlabel_area[lid] += area
+                for lid, _, area in yw_beam_overlap_list:
                     if lid not in jzlabel_area:
                         jzlabel_area[lid] = 0
                     jzlabel_area[lid] += area
@@ -173,7 +179,7 @@ class Model:
                 # 寻找reward最大的valid action_move
                 candidates = []
                 temp_info = copy.deepcopy(self.env.info)
-                for action_move in [0, 1, 2, 3, 4, 5]:
+                for action_move in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
                     jzlabel = self.env.info['jzlabel_dict'][action_jz]
                     is_valid, new_jzlabel = self.env.move(
                         jzlabel=jzlabel, move_type=action_move)
@@ -183,8 +189,10 @@ class Model:
                         continue
                     text_overlap_area, _ = self.env.get_text_overlap_area(temp_info)
                     yw_overlap_area, _ = self.env.get_jz_and_yw_overlap_area(temp_info)
+                    yw_beam_overlap_area, _ = self.env.get_text_and_beam_overlap_area(temp_info)
                     line_overlap_area, _ = self.env.get_line_and_beam_overlap_area(temp_info)
-                    overlap_area = text_overlap_area + yw_overlap_area + line_overlap_area
+                    overlap_area = text_overlap_area + yw_overlap_area + \
+                        yw_beam_overlap_area + line_overlap_area
                     reward = self.env.info['overlap_area'] - overlap_area
                     # print(action_jz, action_move, is_valid, reward)
                     if is_valid:
@@ -200,8 +208,11 @@ class Model:
                 # 告诉环境采取的action
                 new_info, reward, is_end, is_valid = self.env.step(
                     action=[action_jz, action_move])
-                # print(new_info['overlap_area'] if new_info is not None else None,
-                #     reward, is_end, is_valid)
+                area = new_info['overlap_area'] if new_info is not None else 1e10
+                if area <= min_area:
+                    min_area = area
+                    min_step = step
+                print(min_area, min_step, step, area, reward, is_end, is_valid)
                 # print()
 
                 # 打印结果
@@ -210,13 +221,15 @@ class Model:
                         self.option['option']['debug_dir'], self.picid, '%d.png' % (step))
                     cv2.imwrite(output_path, self.env.render(step))
 
-                if is_end:
+                if is_end or step >= 500:
                     break
 
                 step += 1
 
             et = time.time()
-            print('time consuming: %.2f seconds\n' % (et - st))
+            print('time consuming: %.2f seconds' % (et - st))
+            print('[%s] best step: %d, best overlap: %.2f\n' % (
+                self.picid, min_step, min_area))
 
     def train(self):
         """

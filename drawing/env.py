@@ -153,10 +153,15 @@ class Env:
             self.get_text_overlap_area(self.info)
         self.info['yw_overlap_area'], _ = \
             self.get_jz_and_yw_overlap_area(self.info)
+        self.info['yw_beam_overlap_area'], _ = \
+            self.get_text_and_beam_overlap_area(self.info)
         self.info['line_overlap_area'], _ = \
             self.get_line_and_beam_overlap_area(self.info)
-        self.info['overlap_area'] = self.info['text_overlap_area'] + \
-            self.info['yw_overlap_area'] + self.info['line_overlap_area']
+        self.info['overlap_area'] = \
+            self.info['text_overlap_area'] + \
+            self.info['yw_overlap_area'] + \
+            self.info['yw_beam_overlap_area'] + \
+            self.info['line_overlap_area']
 
         return self.info
 
@@ -175,8 +180,10 @@ class Env:
         # 获取reward
         text_overlap_area, _ = self.get_text_overlap_area(self.info)
         yw_overlap_area, _ = self.get_jz_and_yw_overlap_area(self.info)
+        yw_beam_overlap_area, _ = self.get_text_and_beam_overlap_area(self.info)
         line_overlap_area, _ = self.get_line_and_beam_overlap_area(self.info)
-        overlap_area = text_overlap_area + yw_overlap_area + line_overlap_area
+        overlap_area = text_overlap_area + yw_overlap_area + \
+            yw_beam_overlap_area + line_overlap_area
         reward = self.info['overlap_area'] - overlap_area
         self.info['overlap_area'] = overlap_area
 
@@ -285,6 +292,62 @@ class Env:
                 new_jzlabel['box'][3] += height_offset
                 new_jzlabel['points'][1][1] += height_offset
 
+        elif move_type == 6:
+            # 水平向左移动半个框的大小
+            if jzlabel['orientation'] == 'vertical':
+                width_offset = int((jzlabel['box'][2] - jzlabel['box'][0]) / 2)
+                new_jzlabel['box'][0] -= width_offset
+                new_jzlabel['box'][2] -= width_offset
+                new_jzlabel['points'][0][0] -= width_offset
+                new_jzlabel['points'][1][0] -= width_offset
+            else:
+                width_offset = int((jzlabel['box'][2] - jzlabel['box'][0]) / 2)
+                new_jzlabel['box'][0] -= width_offset
+                new_jzlabel['box'][2] -= width_offset
+                new_jzlabel['points'][1][0] -= width_offset
+
+        elif move_type == 7:
+            # 水平向右移动半个框的大小
+            if jzlabel['orientation'] == 'vertical':
+                width_offset = int((jzlabel['box'][2] - jzlabel['box'][0]) / 2)
+                new_jzlabel['box'][0] += width_offset
+                new_jzlabel['box'][2] += width_offset
+                new_jzlabel['points'][0][0] += width_offset
+                new_jzlabel['points'][1][0] += width_offset
+            else:
+                width_offset = int((jzlabel['box'][2] - jzlabel['box'][0]) / 2)
+                new_jzlabel['box'][0] += width_offset
+                new_jzlabel['box'][2] += width_offset
+                new_jzlabel['points'][1][0] += width_offset
+
+        elif move_type == 8:
+            # 垂直向上移动半个框的大小
+            if jzlabel['orientation'] == 'horizontal':
+                height_offset = int((jzlabel['box'][3] - jzlabel['box'][1]) / 2)
+                new_jzlabel['box'][1] -= height_offset
+                new_jzlabel['box'][3] -= height_offset
+                new_jzlabel['points'][0][1] -= height_offset
+                new_jzlabel['points'][1][1] -= height_offset
+            else:
+                height_offset = int((jzlabel['box'][3] - jzlabel['box'][1]) / 2)
+                new_jzlabel['box'][1] -= height_offset
+                new_jzlabel['box'][3] -= height_offset
+                new_jzlabel['points'][1][1] -= height_offset
+
+        elif move_type == 9:
+            # 垂直向下移动半个框的大小
+            if jzlabel['orientation'] == 'horizontal':
+                height_offset = int((jzlabel['box'][3] - jzlabel['box'][1]) / 2)
+                new_jzlabel['box'][1] += height_offset
+                new_jzlabel['box'][3] += height_offset
+                new_jzlabel['points'][0][1] += height_offset
+                new_jzlabel['points'][1][1] += height_offset
+            else:
+                height_offset = int((jzlabel['box'][3] - jzlabel['box'][1]) / 2)
+                new_jzlabel['box'][1] += height_offset
+                new_jzlabel['box'][3] += height_offset
+                new_jzlabel['points'][1][1] += height_offset
+
         # 判断新的jzlabel是否valid
         is_valid = self._judge_jzlabel_valid(new_jzlabel)
 
@@ -346,6 +409,7 @@ class Env:
         is_valid = False
 
         # 判断是否页面范围内
+        is_in_page = False
         pic_width = self.info['pic_box'][2] - self.info['pic_box'][0]
         pic_height = self.info['pic_box'][3] - self.info['pic_box'][1]
         if 0 <= jzlabel['box'][0] < jzlabel['box'][2] < pic_width - 1 and \
@@ -427,6 +491,34 @@ class Env:
 
         return overlap_area, overlap_list
 
+    def get_text_and_beam_overlap_area(self, info):
+        """
+        获取当前jzlabel和beam的重合面积
+        """
+        # 寻找jzlabel和beam之间的overlap
+        scale = self.option['option']['scale']
+        overlap_list = []
+        jzkeys = list(info['jzlabel_dict'].keys())
+        for i in range(len(jzkeys)):
+            jzlabel = info['jzlabel_dict'][jzkeys[i]]
+            [lefta, topa, righta, bottoma] = jzlabel['box']
+            drawing = info['drawing_dict'][jzlabel['did']]['cids']
+            for cid in info['component_dict']:
+                component = info['component_dict'][cid]
+                if component['ctype'] == 'beam' and cid not in drawing:
+                    [leftc, topc, rightc, bottomc] = component['box']
+                    lefti = max(lefta, leftc)
+                    topi = max(topa, topc)
+                    righti = min(righta, rightc)
+                    bottomi = min(bottoma, bottomc)
+                    if righti > lefti and bottomi > topi:
+                        area = 0.1 * (righti - lefti) * (bottomi - topi) / (scale * scale)
+                        overlap_list.append([jzkeys[i], cid, area])
+
+        # 对重合的面积求和
+        overlap_area = sum([area for _, _, area in overlap_list])
+
+        return overlap_area, overlap_list
 
     def get_line_and_beam_overlap_area(self, info):
         """
@@ -480,9 +572,9 @@ class Env:
         jz_strings = []
         for key in keys:
             jzlabel = info['jzlabel_dict'][key]
-            box_string = ','.join([str(round(t, 2)) for t in jzlabel['box']])
-            line_string = ','.join([str(round(t, 2)) for t in jzlabel['points'][0]] + \
-                [str(round(t, 2)) for t in jzlabel['points'][0]])
+            box_string = ','.join([str(round(t, 0)) for t in jzlabel['box']])
+            line_string = ','.join([str(round(t, 0)) for t in jzlabel['points'][0]] + \
+                [str(round(t, 0)) for t in jzlabel['points'][0]])
             jz_strings.append('%s@%s&%s' % (key, box_string, line_string))
 
         return ';'.join(jz_strings)

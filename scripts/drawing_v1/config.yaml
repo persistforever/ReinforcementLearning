@@ -8,9 +8,9 @@ option:
     logs_dir: "/home/caory/data/PDFInsight/deep_rl/logs/"
     seq: "drawing_v1"
     scale: 20
-    move_ratio: 5
+    move_ratio: 6
 
     # model
     gpus: ""
     seed: 12
-    is_draw: False
+    is_draw: True
